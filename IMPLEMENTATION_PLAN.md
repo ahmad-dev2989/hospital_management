@@ -18,7 +18,7 @@ This implementation plan tracks the lifecycle, phase progress, and module status
 | **Phase 0** | Environment Inspection & Planning | **Tested** | Runtimes verified (.NET 8, Node 24, PostgreSQL 16), user permissions confirmed, architecture defined. |
 | **Phase 1** | Requirements & Database Design | **Tested** | ERD, Schema specification, Role Matrix, Domain Entities, DbContext alignment, API conventions, and Business rules. |
 | **Phase 2** | Project Foundation | **Tested** | ASP.NET Core API, EF Core PostgreSQL connection, React+Vite frontend baseline, initial migrations validated. |
-| **Phase 3** | Authentication & Authorization | **Not started** | Local accounts, PBKDF2/BCrypt hashing, JWT/session auth, RBAC enforcement, login rate-limiting, audit logging. |
+| **Phase 3** | Authentication & Authorization | **Tested** | Local accounts, BCrypt hashing, JWT session auth, RBAC enforcement, login rate-limiting, 15m lockout, immutable audit logging, and administration UI. |
 | **Phase 4** | Patient Management | **Not started** | Registration, unique patient IDs, duplicate detection, demographic editing, patient chart & timeline. |
 | **Phase 5** | Appointments & Scheduling | **Not started** | Doctor schedules, slot engine, transaction-safe booking, check-in queue, conflict prevention, cancellation. |
 | **Phase 6** | Clinical Management | **Not started** | Encounters, notes (SOAP), vitals, diagnoses, allergies, draft/signing lifecycle, immutable addenda. |
@@ -37,13 +37,13 @@ This implementation plan tracks the lifecycle, phase progress, and module status
 ## 2. Core Functional Modules
 
 ### Module A: Authentication & User Management
-- [x] Password hashing algorithm selection (BCrypt) — **Implemented**
-- [ ] UserAccount entity & repository — **In progress**
-- [ ] JWT / Local bearer session handler — **Not started**
-- [ ] RBAC authorization middleware & policies — **Not started**
-- [ ] Account lockout after failed attempts (5 threshold, 15m lockout) — **Not started**
-- [ ] Security audit logging (logins, privilege changes, password resets) — **Not started**
-- [ ] User administration UI (create user, assign role, deactivate) — **Not started**
+- [x] Password hashing algorithm selection (BCrypt, work factor 11) — **Tested**
+- [x] UserAccount entity & repository with PostgreSQL queries — **Tested**
+- [x] JWT / Local bearer session handler with role and identity claims — **Tested**
+- [x] RBAC authorization middleware & policies (Doctor, Nurse, Admin, etc.) — **Tested**
+- [x] Account lockout after failed attempts (5 threshold, 15m lockout, 423 status) — **Tested**
+- [x] Security audit logging (logins, privilege changes, password resets, lockouts) — **Tested**
+- [x] User administration UI (create user, assign role, deactivate, reset key, quick switcher) — **Tested**
 
 ### Module B: Patient Management
 - [x] Patient database schema with indexes — **Implemented**

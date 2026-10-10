@@ -14,5 +14,4 @@ public class Drug
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
     public ICollection<InventoryBatch> Batches { get; set; } = new List<InventoryBatch>();
-    public ICollection<PrescriptionItem> PrescriptionItems { get; set; } = new List<PrescriptionItem>();
 }

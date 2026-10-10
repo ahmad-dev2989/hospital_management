@@ -1,6 +1,11 @@
+using System.Text;
 using HospitalApp.Api.Middleware;
 using HospitalApp.Infrastructure.Data;
+using HospitalApp.Infrastructure.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,7 +16,41 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(connectionString));
 
-// 2. Local Desktop CORS Configuration
+// 2. Application Services & DI
+builder.Services.AddScoped<ITokenService, JwtTokenService>();
+builder.Services.AddScoped<IAuditService, AuditService>();
+
+// 3. JWT Authentication & Authorization
+var jwtSecret = builder.Configuration["JwtSettings:Secret"] 
+    ?? "HospitalManagementSystemSecureSecretKey2026!#$LocalOffline789456123";
+var jwtIssuer = builder.Configuration["JwtSettings:Issuer"] ?? "HospitalApp.Local";
+var jwtAudience = builder.Configuration["JwtSettings:Audience"] ?? "HospitalApp.Desktop";
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.RequireHttpsMetadata = false;
+    options.SaveToken = true;
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+        ValidateIssuer = true,
+        ValidIssuer = jwtIssuer,
+        ValidateAudience = true,
+        ValidAudience = jwtAudience,
+        ValidateLifetime = true,
+        ClockSkew = TimeSpan.Zero
+    };
+});
+
+builder.Services.AddAuthorization();
+
+// 4. Local Desktop CORS Configuration
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("LocalDesktopPolicy", policy =>
@@ -23,16 +62,40 @@ builder.Services.AddCors(options =>
     });
 });
 
-// 3. API Controllers & Documentation
+// 5. API Controllers & Swagger with Bearer Support
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+    c.SwaggerDoc("v1", new OpenApiInfo
     {
         Title = "Hospital Management System API",
         Version = "v1",
         Description = "Local Offline Hospital Management System REST API"
+    });
+
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Description = "JWT Authorization header using the Bearer scheme. Format: Bearer {token}",
+        Name = "Authorization",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.Http,
+        Scheme = "Bearer"
+    });
+
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
     });
 });
 
@@ -41,7 +104,7 @@ builder.WebHost.UseUrls("http://127.0.0.1:5000");
 
 var app = builder.Build();
 
-// 4. Database Migration & Seed Verification
+// 6. Database Migration & Seed Verification
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
@@ -60,7 +123,7 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-// 5. Middleware Pipeline
+// 7. Middleware Pipeline
 app.UseMiddleware<GlobalExceptionMiddleware>();
 
 if (app.Environment.IsDevelopment() || true) // Enable swagger locally
@@ -77,6 +140,7 @@ app.UseCors("LocalDesktopPolicy");
 
 app.UseRouting();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();

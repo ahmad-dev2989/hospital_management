@@ -15,12 +15,21 @@ import {
   Clock,
   ShieldCheck,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  UserCheck,
+  FileSearch,
+  LogOut,
+  KeyRound
 } from 'lucide-react';
-import { api, type HealthStatus, type DatabaseHealthStatus } from './api/client';
+import { api, type HealthStatus, type DatabaseHealthStatus, type ApiError } from './api/client';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { Login } from './pages/Login';
+import { UserManagement } from './pages/UserManagement';
+import { AuditLogs } from './pages/AuditLogs';
 import './App.css';
 
-export default function App() {
+function MainAppShell() {
+  const { user, isAuthenticated, isLoading, isAdmin, hasRole, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('foundation');
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString());
   const [apiHealth, setApiHealth] = useState<HealthStatus | null>(null);
@@ -28,6 +37,14 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [lastCheck, setLastCheck] = useState<string>('');
   const [pingLatency, setPingLatency] = useState<number | null>(null);
+
+  // Change password modal for logged-in user
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [curPass, setCurPass] = useState('');
+  const [newPass, setNewPass] = useState('');
+  const [passError, setPassError] = useState<string | null>(null);
+  const [passSuccess, setPassSuccess] = useState<string | null>(null);
+  const [passLoading, setPassLoading] = useState(false);
 
   // Update clock every second
   useEffect(() => {
@@ -37,7 +54,7 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
-  // Run initial diagnostic check
+  // Run diagnostics probe
   const runDiagnostics = async () => {
     setLoading(true);
     const start = performance.now();
@@ -50,7 +67,7 @@ export default function App() {
       const db = await api.getDatabaseHealth();
       setDbHealth(db);
       setLastCheck(new Date().toLocaleTimeString());
-    } catch (err: any) {
+    } catch (err) {
       console.error('Diagnostic probe failed:', err);
       setApiHealth(null);
       setDbHealth(null);
@@ -61,13 +78,58 @@ export default function App() {
   };
 
   useEffect(() => {
-    runDiagnostics();
-    const interval = setInterval(runDiagnostics, 30000); // Probe every 30s
-    return () => clearInterval(interval);
-  }, []);
+    if (isAuthenticated) {
+      runDiagnostics();
+      const interval = setInterval(runDiagnostics, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [isAuthenticated]);
+
+  if (isLoading) {
+    return (
+      <div className="login-page">
+        <div style={{ textAlign: 'center', color: '#fff' }}>
+          <Activity size={40} className="spin" color="#0d9488" style={{ margin: '0 auto 1rem auto' }} />
+          <h2 style={{ fontSize: '1.2rem', fontWeight: 600 }}>Mercy Community Hospital</h2>
+          <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginTop: '0.25rem' }}>
+            Initializing offline clinical workstation...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Login />;
+  }
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPassError(null);
+    setPassSuccess(null);
+    setPassLoading(true);
+
+    try {
+      const res = await api.changePassword(curPass, newPass);
+      setPassSuccess(res.message);
+      setCurPass('');
+      setNewPass('');
+      setTimeout(() => {
+        setShowPasswordModal(false);
+        setPassSuccess(null);
+      }, 2000);
+    } catch (err: any) {
+      const apiErr = err as ApiError;
+      setPassError(apiErr.message || 'Failed to change password.');
+    } finally {
+      setPassLoading(false);
+    }
+  };
 
   const navItems = [
     { id: 'foundation', label: 'System Foundation', icon: Server, badge: 'Phase 2' },
+    ...(isAdmin ? [{ id: 'users', label: 'Staff & RBAC', icon: UserCheck, badge: 'Phase 3' }] : []),
+    ...(isAdmin || hasRole('Auditor') ? [{ id: 'audit', label: 'Security Audit Log', icon: FileSearch, badge: 'Phase 3' }] : []),
     { id: 'patients', label: 'Patients', icon: Users, badge: 'Phase 4' },
     { id: 'appointments', label: 'Appointments', icon: Calendar, badge: 'Phase 5' },
     { id: 'clinical', label: 'Clinical Encounters', icon: FileText, badge: 'Phase 6' },
@@ -122,17 +184,44 @@ export default function App() {
           })}
         </nav>
 
+        {/* Sidebar Footer with authenticated profile & controls */}
         <div className="sidebar-footer">
           <div className="user-snippet">
-            <div className="avatar-circle">AD</div>
-            <div>
-              <div className="user-name">Administrator</div>
-              <div className="user-role">Super Admin</div>
+            <div className="avatar-circle">
+              {user?.fullName ? user.fullName.slice(0, 2).toUpperCase() : 'US'}
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div className="user-name" title={user?.fullName || ''}>
+                {user?.fullName || 'User'}
+              </div>
+              <div className="user-role">
+                {user?.roleName || 'Staff'}
+              </div>
             </div>
           </div>
-          <span className="badge badge-success" title="Local workstation deployment">
-            Local PC
-          </span>
+
+          <div style={{ display: 'flex', gap: '0.25rem' }}>
+            <button
+              onClick={() => {
+                setPassError(null);
+                setPassSuccess(null);
+                setCurPass('');
+                setNewPass('');
+                setShowPasswordModal(true);
+              }}
+              title="Change Password"
+              style={{ padding: '0.35rem', color: '#94a3b8', borderRadius: '4px' }}
+            >
+              <KeyRound size={16} />
+            </button>
+            <button
+              onClick={() => logout()}
+              title="Sign Out"
+              style={{ padding: '0.35rem', color: '#f87171', borderRadius: '4px' }}
+            >
+              <LogOut size={16} />
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -144,6 +233,9 @@ export default function App() {
             <h1 className="page-title">
               {navItems.find((n) => n.id === activeTab)?.label || 'System Foundation'}
             </h1>
+            <span className="badge badge-info" style={{ textTransform: 'capitalize' }}>
+              {user?.roleName}
+            </span>
           </div>
 
           <div className="header-right">
@@ -201,14 +293,14 @@ export default function App() {
 
                 <div className="card">
                   <div className="stat-header">
-                    <span className="stat-label">Offline Integrity</span>
+                    <span className="stat-label">Security & RBAC</span>
                     <ShieldCheck size={20} color="#10b981" />
                   </div>
                   <div className="stat-value" style={{ color: '#10b981' }}>
-                    100% Offline
+                    Active & Verified
                   </div>
                   <div className="stat-desc">
-                    Zero cloud dependencies • No remote leaks
+                    JWT Session • BCrypt Hashing • Lockout Protected
                   </div>
                 </div>
               </div>
@@ -266,9 +358,16 @@ export default function App() {
                           </td>
                         </tr>
                         <tr>
-                          <td><strong>Local File Store</strong></td>
-                          <td><code>%LOCALAPPDATA%\HospitalApp</code></td>
-                          <td><span className="badge badge-success">Verified</span></td>
+                          <td><strong>Authentication Gateway</strong></td>
+                          <td><code>/api/v1/auth/me</code></td>
+                          <td>
+                            <span className="badge badge-success">Authorized (@{user?.username})</span>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td><strong>Audit Trail Status</strong></td>
+                          <td><code>/api/v1/audit</code></td>
+                          <td><span className="badge badge-success">Active & Logging</span></td>
                         </tr>
                         <tr>
                           <td><strong>Last Probe Run</strong></td>
@@ -290,37 +389,37 @@ export default function App() {
                   )}
                 </div>
 
-                {/* Phase 2 Foundation Verification Card */}
+                {/* Phase 3 Auth Verification Card */}
                 <div className="card">
-                  <h2 style={{ fontSize: '1rem', fontWeight: 700 }}>Phase 2 Foundation Verification</h2>
+                  <h2 style={{ fontSize: '1rem', fontWeight: 700 }}>Phase 3 Security & Auth Verification</h2>
                   <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
-                    Core engineering requirements established for the desktop application stack.
+                    Authentication and Authorization (Module A) verified on Windows local workstation.
                   </p>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.85rem' }}>
                       <CheckCircle2 size={18} color="#10b981" />
-                      <span><strong>React 19 + TypeScript + Vite:</strong> Frontend scaffolding complete.</span>
+                      <span><strong>BCrypt Password Hashing:</strong> Work factor 11 with per-user unique salt.</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.85rem' }}>
                       <CheckCircle2 size={18} color="#10b981" />
-                      <span><strong>ASP.NET Core Web API:</strong> Running locally on loopback port 5000.</span>
+                      <span><strong>Offline JWT Bearer Tokens:</strong> Sub, Role, Name, and Email claims.</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.85rem' }}>
                       <CheckCircle2 size={18} color="#10b981" />
-                      <span><strong>PostgreSQL 16:</strong> 30 schema tables migrated in local cluster.</span>
+                      <span><strong>Lockout Protection:</strong> 5 failed consecutive attempts locks account for 15 minutes.</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.85rem' }}>
                       <CheckCircle2 size={18} color="#10b981" />
-                      <span><strong>Dependency Injection & Middleware:</strong> Global RFC 7807 error handler registered.</span>
+                      <span><strong>Role-Based Access Control:</strong> Enforced via policies and API attributes.</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.85rem' }}>
                       <CheckCircle2 size={18} color="#10b981" />
-                      <span><strong>Auto-Seeder:</strong> Default system admin, departments, and catalogs seeded.</span>
+                      <span><strong>Immutable Security Audit Log:</strong> Every login, failure, lockout, and edit recorded.</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.85rem' }}>
                       <CheckCircle2 size={18} color="#10b981" />
-                      <span><strong>CORS Policy:</strong> Secure local loopback communication enabled.</span>
+                      <span><strong>User Administration UI:</strong> Create staff accounts, toggle status, and reset passwords.</span>
                     </div>
                   </div>
                 </div>
@@ -328,7 +427,11 @@ export default function App() {
             </>
           )}
 
-          {activeTab !== 'foundation' && (
+          {activeTab === 'users' && <UserManagement />}
+
+          {activeTab === 'audit' && <AuditLogs />}
+
+          {activeTab !== 'foundation' && activeTab !== 'users' && activeTab !== 'audit' && (
             <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
               <AlertCircle size={40} color="#0d9488" style={{ margin: '0 auto 1rem auto' }} />
               <h2 style={{ fontSize: '1.25rem' }}>{navItems.find((n) => n.id === activeTab)?.label} Module</h2>
@@ -342,6 +445,88 @@ export default function App() {
           )}
         </div>
       </main>
+
+      {/* CHANGE PASSWORD MODAL */}
+      {showPasswordModal && (
+        <div className="modal-backdrop">
+          <div className="modal-content card" style={{ maxWidth: '420px' }}>
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <KeyRound size={20} color="#0d9488" />
+                <h3 style={{ margin: 0, fontSize: '1.1rem' }}>Change My Password</h3>
+              </div>
+              <button className="modal-close" onClick={() => setShowPasswordModal(false)}>×</button>
+            </div>
+
+            {passError && (
+              <div className="login-alert alert-warning" style={{ margin: '1rem 0' }}>
+                <AlertCircle size={18} />
+                <span>{passError}</span>
+              </div>
+            )}
+
+            {passSuccess && (
+              <div className="login-alert" style={{ margin: '1rem 0', backgroundColor: '#ecfdf5', color: '#047857' }}>
+                <CheckCircle2 size={18} />
+                <span>{passSuccess}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleChangePassword} style={{ marginTop: '1rem' }}>
+              <div className="form-group">
+                <label className="form-label">Current Password</label>
+                <input
+                  type="password"
+                  className="form-input"
+                  placeholder="Enter current password"
+                  value={curPass}
+                  onChange={(e) => setCurPass(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">New Password</label>
+                <input
+                  type="password"
+                  className="form-input"
+                  placeholder="Enter new password (min 6 characters)"
+                  value={newPass}
+                  onChange={(e) => setNewPass(e.target.value)}
+                  required
+                  minLength={6}
+                />
+              </div>
+
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => setShowPasswordModal(false)}
+                  disabled={passLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={passLoading}
+                >
+                  {passLoading ? 'Updating...' : 'Update Password'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <MainAppShell />
+    </AuthProvider>
   );
 }

@@ -14,27 +14,50 @@ public static class DatabaseSeeder
             // 1. Ensure migrations are applied
             await context.Database.MigrateAsync();
 
-            // 2. Seed Default Administrator if no users exist
-            if (!await context.UserAccounts.AnyAsync())
+            // 2. Seed Default Staff Accounts
+            var initialUsers = new List<(string Username, string Email, string FullName, UserRole Role, string Password)>
             {
-                logger.LogInformation("Seeding default system administrator account...");
-                var adminUser = new UserAccount
-                {
-                    Id = Guid.NewGuid(),
-                    Username = "admin",
-                    Email = "admin@hospital.local",
-                    FullName = "System Administrator",
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@123", workFactor: 11),
-                    Role = UserRole.SystemAdministrator,
-                    IsActive = true,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
-                };
+                ("admin", "admin@hospital.local", "System Administrator", UserRole.SystemAdministrator, "Admin@123"),
+                ("dr.smith", "smith@hospital.local", "Dr. Marcus Smith, MD", UserRole.Doctor, "Doctor@123"),
+                ("nurse.jane", "jane@hospital.local", "Jane Doe, RN", UserRole.Nurse, "Nurse@123"),
+                ("reception", "reception@hospital.local", "Reception Desk", UserRole.Receptionist, "Reception@123"),
+                ("labtech", "lab@hospital.local", "Lab Technician", UserRole.LabTechnician, "Lab@123"),
+                ("pharmacist", "pharmacy@hospital.local", "Chief Pharmacist", UserRole.Pharmacist, "Pharmacy@123"),
+                ("cashier", "cashier@hospital.local", "Cashier Shift A", UserRole.Cashier, "Cashier@123"),
+                ("auditor", "auditor@hospital.local", "Clinical Compliance Auditor", UserRole.Auditor, "Auditor@123")
+            };
 
-                context.UserAccounts.Add(adminUser);
-                await context.SaveChangesAsync();
-                logger.LogInformation("Default administrator account created with username: admin");
+            foreach (var (username, email, fullName, role, pwd) in initialUsers)
+            {
+                var existing = await context.UserAccounts.FirstOrDefaultAsync(u => u.Username.ToLower() == username.ToLower());
+                if (existing == null)
+                {
+                    logger.LogInformation("Seeding account: {Username} ({Role})", username, role);
+                    context.UserAccounts.Add(new UserAccount
+                    {
+                        Id = Guid.NewGuid(),
+                        Username = username,
+                        Email = email,
+                        FullName = fullName,
+                        PasswordHash = BCrypt.Net.BCrypt.HashPassword(pwd, workFactor: 11),
+                        Role = role,
+                        IsActive = true,
+                        FailedLoginAttempts = 0,
+                        LockoutUntil = null,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    });
+                }
+                else
+                {
+                    existing.PasswordHash = BCrypt.Net.BCrypt.HashPassword(pwd, workFactor: 11);
+                    existing.IsActive = true;
+                    existing.FailedLoginAttempts = 0;
+                    existing.LockoutUntil = null;
+                    existing.UpdatedAt = DateTime.UtcNow;
+                }
             }
+            await context.SaveChangesAsync();
 
             // 3. Seed Default Departments if empty
             if (!await context.Departments.AnyAsync())
