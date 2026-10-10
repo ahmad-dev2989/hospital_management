@@ -16,7 +16,7 @@ This implementation plan tracks the lifecycle, phase progress, and module status
 | Phase | Description | Status | Deliverables / Acceptance Gate |
 |---|---|---|---|
 | **Phase 0** | Environment Inspection & Planning | **Tested** | Runtimes verified (.NET 8, Node 24, PostgreSQL 16), user permissions confirmed, architecture defined. |
-| **Phase 1** | Requirements & Database Design | **In progress** | ERD, Schema specification, Role Matrix, Domain Entities, DbContext alignment, API conventions, and Business rules. |
+| **Phase 1** | Requirements & Database Design | **Tested** | ERD, Schema specification, Role Matrix, Domain Entities, DbContext alignment, API conventions, and Business rules. |
 | **Phase 2** | Project Foundation | **In progress** | ASP.NET Core API, EF Core PostgreSQL connection, React+Vite frontend baseline, initial migrations validated. |
 | **Phase 3** | Authentication & Authorization | **Not started** | Local accounts, PBKDF2/BCrypt hashing, JWT/session auth, RBAC enforcement, login rate-limiting, audit logging. |
 | **Phase 4** | Patient Management | **Not started** | Registration, unique patient IDs, duplicate detection, demographic editing, patient chart & timeline. |
