@@ -465,6 +465,217 @@ class ApiClient {
       method: 'DELETE',
     });
   }
+
+  // Doctor & Department methods
+  async getDoctors(departmentId?: string, activeOnly: boolean = true): Promise<DoctorDto[]> {
+    const params = new URLSearchParams();
+    if (departmentId) params.append('departmentId', departmentId);
+    params.append('activeOnly', activeOnly.toString());
+    return this.request<DoctorDto[]>(`/doctors?${params.toString()}`);
+  }
+
+  async getDoctorById(id: string): Promise<DoctorDto> {
+    return this.request<DoctorDto>(`/doctors/${id}`);
+  }
+
+  async getDoctorSlots(doctorId: string, date: string): Promise<TimeSlotDto[]> {
+    return this.request<TimeSlotDto[]>(`/doctors/${doctorId}/slots?date=${encodeURIComponent(date)}`);
+  }
+
+  async getDepartments(): Promise<DepartmentDto[]> {
+    return this.request<DepartmentDto[]>('/doctors/departments');
+  }
+
+  // Appointment methods
+  async getAppointments(params?: {
+    date?: string;
+    doctorId?: string;
+    departmentId?: string;
+    status?: AppointmentStatus;
+    query?: string;
+    page?: number;
+    pageSize?: number;
+  }): Promise<PagedResult<AppointmentDto>> {
+    const searchParams = new URLSearchParams();
+    if (params?.date) searchParams.append('date', params.date);
+    if (params?.doctorId) searchParams.append('doctorId', params.doctorId);
+    if (params?.departmentId) searchParams.append('departmentId', params.departmentId);
+    if (params?.status !== undefined) searchParams.append('status', params.status.toString());
+    if (params?.query) searchParams.append('query', params.query);
+    if (params?.page) searchParams.append('page', params.page.toString());
+    if (params?.pageSize) searchParams.append('pageSize', params.pageSize.toString());
+
+    const qs = searchParams.toString();
+    return this.request<PagedResult<AppointmentDto>>(`/appointments${qs ? `?${qs}` : ''}`);
+  }
+
+  async getAppointmentById(id: string): Promise<AppointmentDto> {
+    return this.request<AppointmentDto>(`/appointments/${id}`);
+  }
+
+  async bookAppointment(data: BookAppointmentRequest): Promise<AppointmentDto> {
+    return this.request<AppointmentDto>('/appointments', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async checkInAppointment(id: string): Promise<AppointmentDto> {
+    return this.request<AppointmentDto>(`/appointments/${id}/check-in`, {
+      method: 'POST',
+    });
+  }
+
+  async updateAppointmentStatus(id: string, status: AppointmentStatus, note?: string): Promise<AppointmentDto> {
+    return this.request<AppointmentDto>(`/appointments/${id}/status`, {
+      method: 'POST',
+      body: JSON.stringify({ status, note }),
+    });
+  }
+
+  async rescheduleAppointment(id: string, data: RescheduleAppointmentRequest): Promise<AppointmentDto> {
+    return this.request<AppointmentDto>(`/appointments/${id}/reschedule`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async cancelAppointment(id: string, reason: string): Promise<AppointmentDto> {
+    return this.request<AppointmentDto>(`/appointments/${id}/cancel`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+  }
+
+  async getQueueSummary(date?: string, doctorId?: string): Promise<AppointmentQueueSummaryDto> {
+    const params = new URLSearchParams();
+    if (date) params.append('date', date);
+    if (doctorId) params.append('doctorId', doctorId);
+    const qs = params.toString();
+    return this.request<AppointmentQueueSummaryDto>(`/appointments/queue-summary${qs ? `?${qs}` : ''}`);
+  }
+}
+
+// Module C (Appointments & Scheduling) Interfaces
+export type AppointmentStatus =
+  | 0 // Booked
+  | 1 // Confirmed
+  | 2 // Arrived
+  | 3 // Waiting
+  | 4 // InConsultation
+  | 5 // Completed
+  | 6 // Cancelled
+  | 7 // NoShow
+  | 8; // ReschedulePending
+
+export const APPOINTMENT_STATUS_NAMES: Record<AppointmentStatus, string> = {
+  0: 'Booked',
+  1: 'Confirmed',
+  2: 'Arrived',
+  3: 'Waiting',
+  4: 'In Consultation',
+  5: 'Completed',
+  6: 'Cancelled',
+  7: 'No-Show',
+  8: 'Reschedule Pending',
+};
+
+export interface DoctorScheduleDto {
+  id: string;
+  doctorId: string;
+  dayOfWeek: number;
+  dayName: string;
+  startTime: string;
+  endTime: string;
+  slotDurationMinutes: number;
+  isActive: boolean;
+}
+
+export interface DoctorDto {
+  id: string;
+  userId: string;
+  fullName: string;
+  email: string;
+  departmentId: string;
+  departmentName: string;
+  departmentCode: string;
+  licenseNumber: string;
+  specialization: string;
+  consultationFee: number;
+  isActive: boolean;
+  schedules: DoctorScheduleDto[];
+}
+
+export interface TimeSlotDto {
+  startsAt: string;
+  endsAt: string;
+  timeDisplay: string;
+  isAvailable: boolean;
+  appointmentId?: string | null;
+  appointmentNumber?: string | null;
+  patientName?: string | null;
+  status?: AppointmentStatus | null;
+}
+
+export interface AppointmentDto {
+  id: string;
+  appointmentNumber: string;
+  patientId: string;
+  patientNumber: string;
+  patientName: string;
+  patientPhone: string;
+  doctorId: string;
+  doctorName: string;
+  specialization: string;
+  departmentId: string;
+  departmentName: string;
+  startsAt: string;
+  endsAt: string;
+  status: AppointmentStatus;
+  statusName: string;
+  reason?: string | null;
+  cancellationReason?: string | null;
+  idempotencyKey?: string | null;
+  createdAt: string;
+}
+
+export interface BookAppointmentRequest {
+  patientId: string;
+  doctorId: string;
+  departmentId?: string;
+  startsAt: string;
+  endsAt?: string;
+  reason?: string;
+  idempotencyKey?: string;
+}
+
+export interface RescheduleAppointmentRequest {
+  newStartsAt: string;
+  newEndsAt?: string;
+  reason?: string;
+}
+
+export interface CancelAppointmentRequest {
+  reason: string;
+}
+
+export interface AppointmentQueueSummaryDto {
+  totalToday: number;
+  booked: number;
+  waiting: number;
+  inConsultation: number;
+  completed: number;
+  cancelled: number;
+  noShow: number;
+}
+
+export interface DepartmentDto {
+  id: string;
+  code: string;
+  name: string;
+  description?: string;
+  isActive: boolean;
 }
 
 export const api = new ApiClient();
+

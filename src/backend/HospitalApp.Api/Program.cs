@@ -21,6 +21,8 @@ builder.Services.AddScoped<ITokenService, JwtTokenService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<IPatientNumberGenerator, PatientNumberGenerator>();
 builder.Services.AddScoped<IPatientService, PatientService>();
+builder.Services.AddScoped<IAppointmentNumberGenerator, AppointmentNumberGenerator>();
+builder.Services.AddScoped<IAppointmentService, AppointmentService>();
 
 // 3. JWT Authentication & Authorization
 var jwtSecret = builder.Configuration["JwtSettings:Secret"] 

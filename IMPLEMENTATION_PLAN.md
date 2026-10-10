@@ -20,7 +20,7 @@ This implementation plan tracks the lifecycle, phase progress, and module status
 | **Phase 2** | Project Foundation | **Tested** | ASP.NET Core API, EF Core PostgreSQL connection, React+Vite frontend baseline, initial migrations validated. |
 | **Phase 3** | Authentication & Authorization | **Tested** | Local accounts, BCrypt hashing, JWT session auth, RBAC enforcement, login rate-limiting, 15m lockout, immutable audit logging, and administration UI. |
 | **Phase 4** | Patient Management | **Tested** | Registration, unique patient IDs, duplicate detection, demographic editing, patient chart & timeline. |
-| **Phase 5** | Appointments & Scheduling | **Not started** | Doctor schedules, slot engine, transaction-safe booking, check-in queue, conflict prevention, cancellation. |
+| **Phase 5** | Appointments & Scheduling | **Tested** | Doctor schedules, slot engine, transaction-safe booking, check-in queue, conflict prevention, cancellation. |
 | **Phase 6** | Clinical Management | **Not started** | Encounters, notes (SOAP), vitals, diagnoses, allergies, draft/signing lifecycle, immutable addenda. |
 | **Phase 7** | Laboratory Management | **Not started** | Test catalog, order worklist, specimen barcode tracking, result entry, dual-step verification, critical alerts. |
 | **Phase 8** | Pharmacy & Inventory | **Not started** | Drug catalog, FEFO batch tracking, expiry monitoring, transaction-safe dispensing, stock movements ledger. |
@@ -55,11 +55,11 @@ This implementation plan tracks the lifecycle, phase progress, and module status
 - [x] Patient summary chart (encounters, allergies, conditions, active medications) — **Tested**
 
 ### Module C: Appointments & Scheduling
-- [x] Appointment, Doctor, Department, DoctorSchedule schema — **Implemented**
-- [ ] Doctor schedule editor (recurring slots, working intervals, durations) — **Not started**
-- [ ] Transaction-safe appointment slot booking with conflict detection — **Not started**
-- [ ] Reception arrival queue (waiting, in-consultation, completed, no-show) — **Not started**
-- [ ] Rescheduling & cancellation with mandatory audit reason — **Not started**
+- [x] Appointment, Doctor, Department, DoctorSchedule schema — **Tested**
+- [x] Doctor schedule editor (recurring slots, working intervals, durations) — **Tested**
+- [x] Transaction-safe appointment slot booking with conflict detection — **Tested**
+- [x] Reception arrival queue (waiting, in-consultation, completed, no-show) — **Tested**
+- [x] Rescheduling & cancellation with mandatory audit reason — **Tested**
 
 ### Module D: Clinical Management
 - [x] Encounter, ClinicalNote, VitalSign, Diagnosis schema — **Implemented**

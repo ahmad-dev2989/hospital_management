@@ -19,6 +19,7 @@ public static class DatabaseSeeder
             {
                 ("admin", "admin@hospital.local", "System Administrator", UserRole.SystemAdministrator, "Admin@123"),
                 ("dr.smith", "smith@hospital.local", "Dr. Marcus Smith, MD", UserRole.Doctor, "Doctor@123"),
+                ("dr.sarah", "sarah@hospital.local", "Dr. Sarah Jenkins, MD", UserRole.Doctor, "Doctor@123"),
                 ("nurse.jane", "jane@hospital.local", "Jane Doe, RN", UserRole.Nurse, "Nurse@123"),
                 ("reception", "reception@hospital.local", "Reception Desk", UserRole.Receptionist, "Reception@123"),
                 ("labtech", "lab@hospital.local", "Lab Technician", UserRole.LabTechnician, "Lab@123"),
@@ -277,6 +278,156 @@ public static class DatabaseSeeder
                 context.PatientConditions.AddRange(conditions);
                 await context.SaveChangesAsync();
                 logger.LogInformation("Seeded baseline patients, allergies, and chronic conditions.");
+            }
+
+            // 9. Seed Doctors and Weekly Schedules if empty
+            if (!await context.Doctors.AnyAsync())
+            {
+                logger.LogInformation("Seeding clinical doctors and weekly schedules...");
+                var drSmithUser = await context.UserAccounts.FirstOrDefaultAsync(u => u.Username.ToLower() == "dr.smith");
+                var drSarahUser = await context.UserAccounts.FirstOrDefaultAsync(u => u.Username.ToLower() == "dr.sarah");
+                var genDept = await context.Departments.FirstOrDefaultAsync(d => d.Code == "GEN");
+                var pedDept = await context.Departments.FirstOrDefaultAsync(d => d.Code == "PED");
+
+                if (drSmithUser != null && genDept != null)
+                {
+                    var drSmith = new Doctor
+                    {
+                        Id = Guid.NewGuid(),
+                        UserId = drSmithUser.Id,
+                        DepartmentId = genDept.Id,
+                        LicenseNumber = "MD-GEN-2018-091",
+                        Specialization = "Internal & General Medicine",
+                        ConsultationFee = 50.00m,
+                        IsActive = true,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+                    context.Doctors.Add(drSmith);
+
+                    // Add Monday to Friday schedule
+                    for (int day = 1; day <= 5; day++)
+                    {
+                        context.DoctorSchedules.Add(new DoctorSchedule
+                        {
+                            Id = Guid.NewGuid(),
+                            DoctorId = drSmith.Id,
+                            DayOfWeek = day,
+                            StartTime = TimeSpan.FromHours(9),
+                            EndTime = TimeSpan.FromHours(17),
+                            SlotDurationMinutes = 15,
+                            IsActive = true,
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
+                        });
+                    }
+                }
+
+                if (drSarahUser != null && pedDept != null)
+                {
+                    var drSarah = new Doctor
+                    {
+                        Id = Guid.NewGuid(),
+                        UserId = drSarahUser.Id,
+                        DepartmentId = pedDept.Id,
+                        LicenseNumber = "MD-PED-2020-112",
+                        Specialization = "Pediatric Care & Child Health",
+                        ConsultationFee = 60.00m,
+                        IsActive = true,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+                    context.Doctors.Add(drSarah);
+
+                    // Add Monday, Wednesday, Friday schedule
+                    var sarahDays = new[] { 1, 3, 5 };
+                    foreach (var day in sarahDays)
+                    {
+                        context.DoctorSchedules.Add(new DoctorSchedule
+                        {
+                            Id = Guid.NewGuid(),
+                            DoctorId = drSarah.Id,
+                            DayOfWeek = day,
+                            StartTime = new TimeSpan(8, 30, 0),
+                            EndTime = new TimeSpan(16, 30, 0),
+                            SlotDurationMinutes = 20,
+                            IsActive = true,
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
+                        });
+                    }
+                }
+
+                await context.SaveChangesAsync();
+                logger.LogInformation("Seeded clinical doctors and weekly schedules.");
+            }
+
+            // 10. Seed Baseline Appointments if empty
+            if (!await context.Appointments.AnyAsync())
+            {
+                logger.LogInformation("Seeding baseline clinical appointments for today's clinic...");
+                var drSmith = await context.Doctors
+                    .Include(d => d.Department)
+                    .FirstOrDefaultAsync(d => d.LicenseNumber == "MD-GEN-2018-091");
+
+                var p1 = await context.Patients.FirstOrDefaultAsync(p => p.PatientNumber == "HSP-2026-00001");
+                var p2 = await context.Patients.FirstOrDefaultAsync(p => p.PatientNumber == "HSP-2026-00002");
+                var p3 = await context.Patients.FirstOrDefaultAsync(p => p.PatientNumber == "HSP-2026-00003");
+
+                if (drSmith != null && p1 != null && p2 != null && p3 != null)
+                {
+                    var today = DateTime.SpecifyKind(DateTime.UtcNow.Date, DateTimeKind.Utc);
+
+                    var appts = new List<Appointment>
+                    {
+                        new()
+                        {
+                            Id = Guid.NewGuid(),
+                            AppointmentNumber = "APT-2026-00001",
+                            PatientId = p1.Id,
+                            DoctorId = drSmith.Id,
+                            DepartmentId = drSmith.DepartmentId,
+                            StartsAt = today.AddHours(9).AddMinutes(15),
+                            EndsAt = today.AddHours(9).AddMinutes(30),
+                            Status = AppointmentStatus.Waiting,
+                            Reason = "Hypertension blood pressure check-up and medication review",
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
+                        },
+                        new()
+                        {
+                            Id = Guid.NewGuid(),
+                            AppointmentNumber = "APT-2026-00002",
+                            PatientId = p2.Id,
+                            DoctorId = drSmith.Id,
+                            DepartmentId = drSmith.DepartmentId,
+                            StartsAt = today.AddHours(10),
+                            EndsAt = today.AddHours(10).AddMinutes(15),
+                            Status = AppointmentStatus.InConsultation,
+                            Reason = "Persistent wheezing and seasonal asthma exacerbation",
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
+                        },
+                        new()
+                        {
+                            Id = Guid.NewGuid(),
+                            AppointmentNumber = "APT-2026-00003",
+                            PatientId = p3.Id,
+                            DoctorId = drSmith.Id,
+                            DepartmentId = drSmith.DepartmentId,
+                            StartsAt = today.AddHours(11).AddMinutes(30),
+                            EndsAt = today.AddHours(11).AddMinutes(45),
+                            Status = AppointmentStatus.Booked,
+                            Reason = "Annual preventative general wellness check-up",
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
+                        }
+                    };
+
+                    context.Appointments.AddRange(appts);
+                    await context.SaveChangesAsync();
+                    logger.LogInformation("Seeded baseline clinic queue appointments.");
+                }
             }
 
             logger.LogInformation("Database seed checks successfully completed.");
