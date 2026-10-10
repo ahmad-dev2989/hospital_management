@@ -117,3 +117,8 @@ c:\Users\ahmad\Documents\hospital management system\src\backend\HospitalApp.Api\
 c:\Users\ahmad\Documents\hospital management system\src\backend\HospitalApp.Api\obj\Debug\net8.0\HospitalApp.Api.pdb
 c:\Users\ahmad\Documents\hospital management system\src\backend\HospitalApp.Api\obj\Debug\net8.0\HospitalApp.Api.genruntimeconfig.cache
 c:\Users\ahmad\Documents\hospital management system\src\backend\HospitalApp.Api\obj\Debug\net8.0\ref\HospitalApp.Api.dll
+C:\Users\ahmad\Documents\hospital management system\src\backend\HospitalApp.Api\bin\Debug\net8.0\Microsoft.OpenApi.dll
+C:\Users\ahmad\Documents\hospital management system\src\backend\HospitalApp.Api\bin\Debug\net8.0\Swashbuckle.AspNetCore.Swagger.dll
+C:\Users\ahmad\Documents\hospital management system\src\backend\HospitalApp.Api\bin\Debug\net8.0\Swashbuckle.AspNetCore.SwaggerGen.dll
+C:\Users\ahmad\Documents\hospital management system\src\backend\HospitalApp.Api\bin\Debug\net8.0\Swashbuckle.AspNetCore.SwaggerUI.dll
+C:\Users\ahmad\Documents\hospital management system\src\backend\HospitalApp.Api\obj\Debug\net8.0\HospitalApp.Api.MvcApplicationPartsAssemblyInfo.cs

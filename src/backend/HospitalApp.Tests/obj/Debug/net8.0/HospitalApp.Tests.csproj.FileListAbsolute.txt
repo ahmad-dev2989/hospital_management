@@ -130,3 +130,7 @@ c:\Users\ahmad\Documents\hospital management system\src\backend\HospitalApp.Test
 c:\Users\ahmad\Documents\hospital management system\src\backend\HospitalApp.Tests\obj\Debug\net8.0\HospitalApp.Tests.pdb
 c:\Users\ahmad\Documents\hospital management system\src\backend\HospitalApp.Tests\obj\Debug\net8.0\HospitalApp.Tests.genruntimeconfig.cache
 c:\Users\ahmad\Documents\hospital management system\src\backend\HospitalApp.Tests\obj\Debug\net8.0\ref\HospitalApp.Tests.dll
+C:\Users\ahmad\Documents\hospital management system\src\backend\HospitalApp.Tests\bin\Debug\net8.0\Microsoft.OpenApi.dll
+C:\Users\ahmad\Documents\hospital management system\src\backend\HospitalApp.Tests\bin\Debug\net8.0\Swashbuckle.AspNetCore.Swagger.dll
+C:\Users\ahmad\Documents\hospital management system\src\backend\HospitalApp.Tests\bin\Debug\net8.0\Swashbuckle.AspNetCore.SwaggerGen.dll
+C:\Users\ahmad\Documents\hospital management system\src\backend\HospitalApp.Tests\bin\Debug\net8.0\Swashbuckle.AspNetCore.SwaggerUI.dll
