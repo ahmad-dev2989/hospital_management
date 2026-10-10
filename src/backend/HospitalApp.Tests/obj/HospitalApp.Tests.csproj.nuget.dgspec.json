@@ -1,0 +1,316 @@
+{
+  "format": 1,
+  "restore": {
+    "C:\\Users\\ahmad\\Documents\\hospital management system\\src\\backend\\HospitalApp.Tests\\HospitalApp.Tests.csproj": {}
+  },
+  "projects": {
+    "C:\\Users\\ahmad\\Documents\\hospital management system\\src\\backend\\HospitalApp.Api\\HospitalApp.Api.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\Users\\ahmad\\Documents\\hospital management system\\src\\backend\\HospitalApp.Api\\HospitalApp.Api.csproj",
+        "projectName": "HospitalApp.Api",
+        "projectPath": "C:\\Users\\ahmad\\Documents\\hospital management system\\src\\backend\\HospitalApp.Api\\HospitalApp.Api.csproj",
+        "packagesPath": "C:\\Users\\ahmad\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\ahmad\\Documents\\hospital management system\\src\\backend\\HospitalApp.Api\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\ahmad\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "C:\\Users\\ahmad\\Documents\\hospital management system\\src\\backend\\HospitalApp.Core\\HospitalApp.Core.csproj": {
+                "projectPath": "C:\\Users\\ahmad\\Documents\\hospital management system\\src\\backend\\HospitalApp.Core\\HospitalApp.Core.csproj"
+              },
+              "C:\\Users\\ahmad\\Documents\\hospital management system\\src\\backend\\HospitalApp.Infrastructure\\HospitalApp.Infrastructure.csproj": {
+                "projectPath": "C:\\Users\\ahmad\\Documents\\hospital management system\\src\\backend\\HospitalApp.Infrastructure\\HospitalApp.Infrastructure.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "Microsoft.AspNetCore.Authentication.JwtBearer": {
+              "target": "Package",
+              "version": "[8.0.11, )"
+            },
+            "Microsoft.EntityFrameworkCore.Design": {
+              "include": "Runtime, Build, Native, ContentFiles, Analyzers, BuildTransitive",
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[8.0.11, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.AspNetCore.App": {
+              "privateAssets": "none"
+            },
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Users\\ahmad\\AppData\\Local\\Microsoft\\dotnet\\sdk\\8.0.425/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "C:\\Users\\ahmad\\Documents\\hospital management system\\src\\backend\\HospitalApp.Core\\HospitalApp.Core.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\Users\\ahmad\\Documents\\hospital management system\\src\\backend\\HospitalApp.Core\\HospitalApp.Core.csproj",
+        "projectName": "HospitalApp.Core",
+        "projectPath": "C:\\Users\\ahmad\\Documents\\hospital management system\\src\\backend\\HospitalApp.Core\\HospitalApp.Core.csproj",
+        "packagesPath": "C:\\Users\\ahmad\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\ahmad\\Documents\\hospital management system\\src\\backend\\HospitalApp.Core\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\ahmad\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "BCrypt.Net-Next": {
+              "target": "Package",
+              "version": "[4.0.3, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Users\\ahmad\\AppData\\Local\\Microsoft\\dotnet\\sdk\\8.0.425/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "C:\\Users\\ahmad\\Documents\\hospital management system\\src\\backend\\HospitalApp.Infrastructure\\HospitalApp.Infrastructure.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\Users\\ahmad\\Documents\\hospital management system\\src\\backend\\HospitalApp.Infrastructure\\HospitalApp.Infrastructure.csproj",
+        "projectName": "HospitalApp.Infrastructure",
+        "projectPath": "C:\\Users\\ahmad\\Documents\\hospital management system\\src\\backend\\HospitalApp.Infrastructure\\HospitalApp.Infrastructure.csproj",
+        "packagesPath": "C:\\Users\\ahmad\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\ahmad\\Documents\\hospital management system\\src\\backend\\HospitalApp.Infrastructure\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\ahmad\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "C:\\Users\\ahmad\\Documents\\hospital management system\\src\\backend\\HospitalApp.Core\\HospitalApp.Core.csproj": {
+                "projectPath": "C:\\Users\\ahmad\\Documents\\hospital management system\\src\\backend\\HospitalApp.Core\\HospitalApp.Core.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "Microsoft.EntityFrameworkCore.Design": {
+              "include": "Runtime, Build, Native, ContentFiles, Analyzers, BuildTransitive",
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[8.0.11, )"
+            },
+            "Npgsql.EntityFrameworkCore.PostgreSQL": {
+              "target": "Package",
+              "version": "[8.0.11, )"
+            },
+            "System.IdentityModel.Tokens.Jwt": {
+              "target": "Package",
+              "version": "[8.0.11, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Users\\ahmad\\AppData\\Local\\Microsoft\\dotnet\\sdk\\8.0.425/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "C:\\Users\\ahmad\\Documents\\hospital management system\\src\\backend\\HospitalApp.Tests\\HospitalApp.Tests.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\Users\\ahmad\\Documents\\hospital management system\\src\\backend\\HospitalApp.Tests\\HospitalApp.Tests.csproj",
+        "projectName": "HospitalApp.Tests",
+        "projectPath": "C:\\Users\\ahmad\\Documents\\hospital management system\\src\\backend\\HospitalApp.Tests\\HospitalApp.Tests.csproj",
+        "packagesPath": "C:\\Users\\ahmad\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\ahmad\\Documents\\hospital management system\\src\\backend\\HospitalApp.Tests\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\ahmad\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "C:\\Users\\ahmad\\Documents\\hospital management system\\src\\backend\\HospitalApp.Api\\HospitalApp.Api.csproj": {
+                "projectPath": "C:\\Users\\ahmad\\Documents\\hospital management system\\src\\backend\\HospitalApp.Api\\HospitalApp.Api.csproj"
+              },
+              "C:\\Users\\ahmad\\Documents\\hospital management system\\src\\backend\\HospitalApp.Core\\HospitalApp.Core.csproj": {
+                "projectPath": "C:\\Users\\ahmad\\Documents\\hospital management system\\src\\backend\\HospitalApp.Core\\HospitalApp.Core.csproj"
+              },
+              "C:\\Users\\ahmad\\Documents\\hospital management system\\src\\backend\\HospitalApp.Infrastructure\\HospitalApp.Infrastructure.csproj": {
+                "projectPath": "C:\\Users\\ahmad\\Documents\\hospital management system\\src\\backend\\HospitalApp.Infrastructure\\HospitalApp.Infrastructure.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "Microsoft.NET.Test.Sdk": {
+              "target": "Package",
+              "version": "[17.8.0, )"
+            },
+            "coverlet.collector": {
+              "target": "Package",
+              "version": "[6.0.0, )"
+            },
+            "xunit": {
+              "target": "Package",
+              "version": "[2.5.3, )"
+            },
+            "xunit.runner.visualstudio": {
+              "target": "Package",
+              "version": "[2.5.3, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Users\\ahmad\\AppData\\Local\\Microsoft\\dotnet\\sdk\\8.0.425/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}

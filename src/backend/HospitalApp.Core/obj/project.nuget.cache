@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "kzzU9YbG/yg=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\ahmad\\Documents\\hospital management system\\src\\backend\\HospitalApp.Core\\HospitalApp.Core.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\ahmad\\.nuget\\packages\\bcrypt.net-next\\4.0.3\\bcrypt.net-next.4.0.3.nupkg.sha512"
+  ],
+  "logs": []
+}

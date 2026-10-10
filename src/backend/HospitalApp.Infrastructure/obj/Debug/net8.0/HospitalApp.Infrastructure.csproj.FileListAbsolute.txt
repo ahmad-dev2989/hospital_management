@@ -1,0 +1,17 @@
+c:\Users\ahmad\Documents\hospital management system\src\backend\HospitalApp.Infrastructure\bin\Debug\net8.0\HospitalApp.Infrastructure.deps.json
+c:\Users\ahmad\Documents\hospital management system\src\backend\HospitalApp.Infrastructure\bin\Debug\net8.0\HospitalApp.Infrastructure.runtimeconfig.json
+c:\Users\ahmad\Documents\hospital management system\src\backend\HospitalApp.Infrastructure\bin\Debug\net8.0\HospitalApp.Infrastructure.dll
+c:\Users\ahmad\Documents\hospital management system\src\backend\HospitalApp.Infrastructure\bin\Debug\net8.0\HospitalApp.Infrastructure.pdb
+c:\Users\ahmad\Documents\hospital management system\src\backend\HospitalApp.Infrastructure\bin\Debug\net8.0\HospitalApp.Core.dll
+c:\Users\ahmad\Documents\hospital management system\src\backend\HospitalApp.Infrastructure\bin\Debug\net8.0\HospitalApp.Core.pdb
+c:\Users\ahmad\Documents\hospital management system\src\backend\HospitalApp.Infrastructure\obj\Debug\net8.0\HospitalApp.Infrastructure.csproj.AssemblyReference.cache
+c:\Users\ahmad\Documents\hospital management system\src\backend\HospitalApp.Infrastructure\obj\Debug\net8.0\HospitalApp.Infrastructure.GeneratedMSBuildEditorConfig.editorconfig
+c:\Users\ahmad\Documents\hospital management system\src\backend\HospitalApp.Infrastructure\obj\Debug\net8.0\HospitalApp.Infrastructure.AssemblyInfoInputs.cache
+c:\Users\ahmad\Documents\hospital management system\src\backend\HospitalApp.Infrastructure\obj\Debug\net8.0\HospitalApp.Infrastructure.AssemblyInfo.cs
+c:\Users\ahmad\Documents\hospital management system\src\backend\HospitalApp.Infrastructure\obj\Debug\net8.0\HospitalApp.Infrastructure.csproj.CoreCompileInputs.cache
+c:\Users\ahmad\Documents\hospital management system\src\backend\HospitalApp.Infrastructure\obj\Debug\net8.0\Hospital.54D7319A.Up2Date
+c:\Users\ahmad\Documents\hospital management system\src\backend\HospitalApp.Infrastructure\obj\Debug\net8.0\HospitalApp.Infrastructure.dll
+c:\Users\ahmad\Documents\hospital management system\src\backend\HospitalApp.Infrastructure\obj\Debug\net8.0\refint\HospitalApp.Infrastructure.dll
+c:\Users\ahmad\Documents\hospital management system\src\backend\HospitalApp.Infrastructure\obj\Debug\net8.0\HospitalApp.Infrastructure.pdb
+c:\Users\ahmad\Documents\hospital management system\src\backend\HospitalApp.Infrastructure\obj\Debug\net8.0\HospitalApp.Infrastructure.genruntimeconfig.cache
+c:\Users\ahmad\Documents\hospital management system\src\backend\HospitalApp.Infrastructure\obj\Debug\net8.0\ref\HospitalApp.Infrastructure.dll
