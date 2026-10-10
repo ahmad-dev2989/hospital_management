@@ -98,6 +98,134 @@ export interface UpdateUserRequest {
   isActive: boolean;
 }
 
+// Patient Management Interfaces
+export type AllergySeverity = 0 | 1 | 2 | 3; // 0=Mild, 1=Moderate, 2=Severe, 3=LifeThreatening
+
+export interface PatientDto {
+  id: string;
+  patientNumber: string;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  dateOfBirth: string;
+  age: number;
+  gender: string;
+  bloodGroup: string | null;
+  phone: string;
+  email: string | null;
+  address: string | null;
+  emergencyContactName: string | null;
+  emergencyContactPhone: string | null;
+  isActive: boolean;
+  allergiesCount: number;
+  hasHighRiskAllergy: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreatePatientRequest {
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string;
+  gender: string;
+  bloodGroup?: string | null;
+  phone: string;
+  email?: string | null;
+  address?: string | null;
+  emergencyContactName?: string | null;
+  emergencyContactPhone?: string | null;
+  bypassDuplicateWarning?: boolean;
+}
+
+export interface UpdatePatientRequest {
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string;
+  gender: string;
+  bloodGroup?: string | null;
+  phone: string;
+  email?: string | null;
+  address?: string | null;
+  emergencyContactName?: string | null;
+  emergencyContactPhone?: string | null;
+}
+
+export interface DuplicateMatchDto {
+  patientId: string;
+  patientNumber: string;
+  fullName: string;
+  dateOfBirth: string;
+  phone: string;
+  matchReason: string;
+  confidenceScore: 'High' | 'Medium';
+}
+
+export interface CheckDuplicateResponse {
+  hasPotentialDuplicates: boolean;
+  matches: DuplicateMatchDto[];
+}
+
+export interface PatientAllergyDto {
+  id: string;
+  patientId: string;
+  allergen: string;
+  reaction: string;
+  severity: AllergySeverity;
+  severityName: string;
+  recordedAt: string;
+}
+
+export interface AddAllergyRequest {
+  allergen: string;
+  reaction: string;
+  severity: AllergySeverity;
+}
+
+export interface PatientConditionDto {
+  id: string;
+  patientId: string;
+  conditionName: string;
+  status: string;
+  diagnosedDate: string | null;
+  createdAt: string;
+}
+
+export interface AddConditionRequest {
+  conditionName: string;
+  status?: string;
+  diagnosedDate?: string | null;
+}
+
+export interface PatientEncounterSummaryDto {
+  id: string;
+  encounterDate: string;
+  status: string;
+  chiefComplaint: string | null;
+  doctorName: string;
+  departmentName: string;
+}
+
+export interface PatientVitalSignSummaryDto {
+  id: string;
+  recordedAt: string;
+  bloodPressure: string;
+  heartRate: number | null;
+  temperature: number | null;
+  respiratoryRate: number | null;
+  oxygenSaturation: number | null;
+}
+
+export interface PatientChartDto {
+  demographics: PatientDto;
+  allergies: PatientAllergyDto[];
+  conditions: PatientConditionDto[];
+  recentEncounters: PatientEncounterSummaryDto[];
+  recentVitals: PatientVitalSignSummaryDto[];
+  totalAppointments: number;
+  totalInvoices: number;
+  outstandingBalance: number;
+}
+
 class ApiClient {
   private token: string | null = null;
 
@@ -262,6 +390,80 @@ class ApiClient {
 
     const qs = query.toString() ? `?${query.toString()}` : '';
     return this.request<PagedResult<AuditEventDto>>(`/audit${qs}`);
+  }
+
+  // Patient Management (Module B)
+  async getPatients(params: { query?: string; gender?: string; isActive?: boolean; page?: number; pageSize?: number } = {}): Promise<PagedResult<PatientDto>> {
+    const query = new URLSearchParams();
+    if (params.query) query.append('search', params.query);
+    if (params.gender) query.append('gender', params.gender);
+    if (params.isActive !== undefined) query.append('isActive', params.isActive.toString());
+    if (params.page) query.append('page', params.page.toString());
+    if (params.pageSize) query.append('pageSize', params.pageSize.toString());
+
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return this.request<PagedResult<PatientDto>>(`/patients${qs}`);
+  }
+
+  async getPatientById(id: string): Promise<PatientDto> {
+    return this.request<PatientDto>(`/patients/${id}`);
+  }
+
+  async checkDuplicates(data: CreatePatientRequest): Promise<CheckDuplicateResponse> {
+    return this.request<CheckDuplicateResponse>('/patients/check-duplicates', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async createPatient(data: CreatePatientRequest): Promise<PatientDto> {
+    return this.request<PatientDto>('/patients', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updatePatient(id: string, data: UpdatePatientRequest): Promise<PatientDto> {
+    return this.request<PatientDto>(`/patients/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async togglePatientActive(id: string): Promise<{ isActive: boolean; message: string }> {
+    return this.request<{ isActive: boolean; message: string }>(`/patients/${id}/toggle-active`, {
+      method: 'POST',
+    });
+  }
+
+  async getPatientChart(id: string): Promise<PatientChartDto> {
+    return this.request<PatientChartDto>(`/patients/${id}/chart`);
+  }
+
+  async addAllergy(patientId: string, data: AddAllergyRequest): Promise<PatientAllergyDto> {
+    return this.request<PatientAllergyDto>(`/patients/${patientId}/allergies`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async removeAllergy(patientId: string, allergyId: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/patients/${patientId}/allergies/${allergyId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async addCondition(patientId: string, data: AddConditionRequest): Promise<PatientConditionDto> {
+    return this.request<PatientConditionDto>(`/patients/${patientId}/conditions`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async removeCondition(patientId: string, conditionId: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/patients/${patientId}/conditions/${conditionId}`, {
+      method: 'DELETE',
+    });
   }
 }
 

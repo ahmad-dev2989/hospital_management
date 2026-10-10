@@ -19,6 +19,8 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 // 2. Application Services & DI
 builder.Services.AddScoped<ITokenService, JwtTokenService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
+builder.Services.AddScoped<IPatientNumberGenerator, PatientNumberGenerator>();
+builder.Services.AddScoped<IPatientService, PatientService>();
 
 // 3. JWT Authentication & Authorization
 var jwtSecret = builder.Configuration["JwtSettings:Secret"] 

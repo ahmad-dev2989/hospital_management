@@ -149,6 +149,136 @@ public static class DatabaseSeeder
                 await context.SaveChangesAsync();
             }
 
+            // 8. Seed Baseline Clinical Patients if empty
+            if (!await context.Patients.AnyAsync())
+            {
+                logger.LogInformation("Seeding baseline clinical patient records...");
+                var p1 = new Patient
+                {
+                    Id = Guid.NewGuid(),
+                    PatientNumber = "HSP-2026-00001",
+                    FirstName = "Eleanor",
+                    LastName = "Vance",
+                    DateOfBirth = DateTime.SpecifyKind(new DateTime(1964, 5, 12), DateTimeKind.Utc),
+                    Gender = "Female",
+                    BloodGroup = "O+",
+                    Phone = "+1-555-0142",
+                    Email = "eleanor.vance@example.local",
+                    Address = "742 Evergreen Terrace, Springfield",
+                    EmergencyContactName = "Thomas Vance (Spouse)",
+                    EmergencyContactPhone = "+1-555-0143",
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+
+                var p2 = new Patient
+                {
+                    Id = Guid.NewGuid(),
+                    PatientNumber = "HSP-2026-00002",
+                    FirstName = "Arthur",
+                    LastName = "Pendelton",
+                    DateOfBirth = DateTime.SpecifyKind(new DateTime(1982, 11, 23), DateTimeKind.Utc),
+                    Gender = "Male",
+                    BloodGroup = "A+",
+                    Phone = "+1-555-0188",
+                    Email = "arthur.p@example.local",
+                    Address = "1204 Oak Ridge Dr, Springfield",
+                    EmergencyContactName = "Clara Pendelton (Sister)",
+                    EmergencyContactPhone = "+1-555-0189",
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+
+                var p3 = new Patient
+                {
+                    Id = Guid.NewGuid(),
+                    PatientNumber = "HSP-2026-00003",
+                    FirstName = "Maya",
+                    LastName = "Lin",
+                    DateOfBirth = DateTime.SpecifyKind(new DateTime(1995, 3, 8), DateTimeKind.Utc),
+                    Gender = "Female",
+                    BloodGroup = "B-",
+                    Phone = "+1-555-0177",
+                    Email = "maya.lin@example.local",
+                    Address = "45 Elm Street, Apt 3B, Springfield",
+                    EmergencyContactName = "David Lin (Father)",
+                    EmergencyContactPhone = "+1-555-0178",
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+
+                context.Patients.AddRange(p1, p2, p3);
+                await context.SaveChangesAsync();
+
+                var allergies = new List<PatientAllergy>
+                {
+                    new()
+                    {
+                        Id = Guid.NewGuid(),
+                        PatientId = p1.Id,
+                        Allergen = "Penicillin",
+                        Reaction = "Anaphylaxis, severe hives and bronchospasm",
+                        Severity = AllergySeverity.LifeThreatening,
+                        RecordedAt = DateTime.UtcNow
+                    },
+                    new()
+                    {
+                        Id = Guid.NewGuid(),
+                        PatientId = p1.Id,
+                        Allergen = "Aspirin",
+                        Reaction = "Gastric distress, mild rash",
+                        Severity = AllergySeverity.Moderate,
+                        RecordedAt = DateTime.UtcNow
+                    },
+                    new()
+                    {
+                        Id = Guid.NewGuid(),
+                        PatientId = p2.Id,
+                        Allergen = "Sulfa Drugs",
+                        Reaction = "Skin peeling, erythema",
+                        Severity = AllergySeverity.Severe,
+                        RecordedAt = DateTime.UtcNow
+                    }
+                };
+
+                context.PatientAllergies.AddRange(allergies);
+
+                var conditions = new List<PatientCondition>
+                {
+                    new()
+                    {
+                        Id = Guid.NewGuid(),
+                        PatientId = p1.Id,
+                        ConditionName = "Essential Hypertension",
+                        Status = "Active",
+                        DiagnosedDate = DateTime.SpecifyKind(new DateTime(2018, 4, 15), DateTimeKind.Utc)
+                    },
+                    new()
+                    {
+                        Id = Guid.NewGuid(),
+                        PatientId = p1.Id,
+                        ConditionName = "Type 2 Diabetes Mellitus",
+                        Status = "Active",
+                        DiagnosedDate = DateTime.SpecifyKind(new DateTime(2020, 9, 21), DateTimeKind.Utc)
+                    },
+                    new()
+                    {
+                        Id = Guid.NewGuid(),
+                        PatientId = p2.Id,
+                        ConditionName = "Asthma (Moderate Persistent)",
+                        Status = "Active",
+                        DiagnosedDate = DateTime.SpecifyKind(new DateTime(2015, 6, 10), DateTimeKind.Utc)
+                    }
+                };
+
+                context.PatientConditions.AddRange(conditions);
+                await context.SaveChangesAsync();
+                logger.LogInformation("Seeded baseline patients, allergies, and chronic conditions.");
+            }
+
             logger.LogInformation("Database seed checks successfully completed.");
         }
         catch (Exception ex)

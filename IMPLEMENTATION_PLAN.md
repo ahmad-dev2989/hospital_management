@@ -19,7 +19,7 @@ This implementation plan tracks the lifecycle, phase progress, and module status
 | **Phase 1** | Requirements & Database Design | **Tested** | ERD, Schema specification, Role Matrix, Domain Entities, DbContext alignment, API conventions, and Business rules. |
 | **Phase 2** | Project Foundation | **Tested** | ASP.NET Core API, EF Core PostgreSQL connection, React+Vite frontend baseline, initial migrations validated. |
 | **Phase 3** | Authentication & Authorization | **Tested** | Local accounts, BCrypt hashing, JWT session auth, RBAC enforcement, login rate-limiting, 15m lockout, immutable audit logging, and administration UI. |
-| **Phase 4** | Patient Management | **Not started** | Registration, unique patient IDs, duplicate detection, demographic editing, patient chart & timeline. |
+| **Phase 4** | Patient Management | **Tested** | Registration, unique patient IDs, duplicate detection, demographic editing, patient chart & timeline. |
 | **Phase 5** | Appointments & Scheduling | **Not started** | Doctor schedules, slot engine, transaction-safe booking, check-in queue, conflict prevention, cancellation. |
 | **Phase 6** | Clinical Management | **Not started** | Encounters, notes (SOAP), vitals, diagnoses, allergies, draft/signing lifecycle, immutable addenda. |
 | **Phase 7** | Laboratory Management | **Not started** | Test catalog, order worklist, specimen barcode tracking, result entry, dual-step verification, critical alerts. |
@@ -46,13 +46,13 @@ This implementation plan tracks the lifecycle, phase progress, and module status
 - [x] User administration UI (create user, assign role, deactivate, reset key, quick switcher) — **Tested**
 
 ### Module B: Patient Management
-- [x] Patient database schema with indexes — **Implemented**
-- [ ] Patient entity & domain validation — **In progress**
-- [ ] Unique human-readable patient number generator (`HSP-YYYY-XXXXX`) — **Not started**
-- [ ] Patient search with exact match prioritization and phone/name filtering — **Not started**
-- [ ] Duplicate candidate matching algorithm (name + DOB + phone match) — **Not started**
-- [ ] Patient demographic edit & soft-deactivation (preserves historical links) — **Not started**
-- [ ] Patient summary chart (encounters, allergies, conditions, active medications) — **Not started**
+- [x] Patient database schema with indexes — **Tested**
+- [x] Patient entity & domain validation — **Tested**
+- [x] Unique human-readable patient number generator (`HSP-YYYY-XXXXX`) — **Tested**
+- [x] Patient search with exact match prioritization and phone/name filtering — **Tested**
+- [x] Duplicate candidate matching algorithm (name + DOB + phone match) — **Tested**
+- [x] Patient demographic edit & soft-deactivation (preserves historical links) — **Tested**
+- [x] Patient summary chart (encounters, allergies, conditions, active medications) — **Tested**
 
 ### Module C: Appointments & Scheduling
 - [x] Appointment, Doctor, Department, DoctorSchedule schema — **Implemented**
