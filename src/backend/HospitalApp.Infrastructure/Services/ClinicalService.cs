@@ -10,56 +10,26 @@ namespace HospitalApp.Infrastructure.Services;
 public class ClinicalService : IClinicalService
 {
     private readonly ApplicationDbContext _context;
-    private readonly IPrescriptionNumberGenerator _prescriptionNumberGenerator;
     private readonly IAuditService _auditService;
     private readonly ILogger<ClinicalService> _logger;
-
-    private static readonly List<Icd10LookupDto> StandardIcd10Catalog = new()
-    {
-        new() { Code = "I10", Description = "Essential (primary) hypertension", Category = "Cardiovascular" },
-        new() { Code = "I25.10", Description = "Atherosclerotic heart disease of native coronary artery", Category = "Cardiovascular" },
-        new() { Code = "I50.9", Description = "Heart failure, unspecified", Category = "Cardiovascular" },
-        new() { Code = "E11.9", Description = "Type 2 diabetes mellitus without complications", Category = "Endocrine & Metabolic" },
-        new() { Code = "E11.65", Description = "Type 2 diabetes mellitus with hyperglycemia", Category = "Endocrine & Metabolic" },
-        new() { Code = "E03.9", Description = "Hypothyroidism, unspecified", Category = "Endocrine & Metabolic" },
-        new() { Code = "E78.5", Description = "Hyperlipidemia, unspecified", Category = "Endocrine & Metabolic" },
-        new() { Code = "J06.9", Description = "Acute upper respiratory infection, unspecified", Category = "Respiratory" },
-        new() { Code = "J45.909", Description = "Unspecified asthma, uncomplicated", Category = "Respiratory" },
-        new() { Code = "J44.9", Description = "Chronic obstructive pulmonary disease, unspecified", Category = "Respiratory" },
-        new() { Code = "J18.9", Description = "Pneumonia, unspecified organism", Category = "Respiratory" },
-        new() { Code = "J02.9", Description = "Acute pharyngitis, unspecified", Category = "Respiratory" },
-        new() { Code = "K21.9", Description = "Gastro-esophageal reflux disease without esophagitis", Category = "Gastrointestinal" },
-        new() { Code = "K29.70", Description = "Gastritis, unspecified, without bleeding", Category = "Gastrointestinal" },
-        new() { Code = "A09", Description = "Infectious gastroenteritis and colitis, unspecified", Category = "Gastrointestinal" },
-        new() { Code = "M54.5", Description = "Low back pain", Category = "Musculoskeletal" },
-        new() { Code = "M25.50", Description = "Pain in unspecified joint", Category = "Musculoskeletal" },
-        new() { Code = "N39.0", Description = "Urinary tract infection, site not specified", Category = "Genitourinary" },
-        new() { Code = "R51", Description = "Headache", Category = "Symptoms & Signs" },
-        new() { Code = "R05", Description = "Cough", Category = "Symptoms & Signs" },
-        new() { Code = "R50.9", Description = "Fever, unspecified", Category = "Symptoms & Signs" },
-        new() { Code = "R10.9", Description = "Unspecified abdominal pain", Category = "Symptoms & Signs" },
-        new() { Code = "R42", Description = "Dizziness and giddiness", Category = "Symptoms & Signs" },
-        new() { Code = "L03.90", Description = "Cellulitis, unspecified", Category = "Dermatological" },
-        new() { Code = "Z00.00", Description = "Encounter for general adult medical examination without abnormal findings", Category = "Preventative & General" }
-    };
+    private static readonly SemaphoreSlim _rxLock = new(1, 1);
 
     public ClinicalService(
         ApplicationDbContext context,
-        IPrescriptionNumberGenerator prescriptionNumberGenerator,
         IAuditService auditService,
         ILogger<ClinicalService> logger)
     {
         _context = context;
-        _prescriptionNumberGenerator = prescriptionNumberGenerator;
         _auditService = auditService;
         _logger = logger;
     }
 
-    public async Task<PagedResult<EncounterSummaryDto>> GetEncountersAsync(
-        Guid? patientId = null,
-        Guid? doctorId = null,
-        EncounterStatus? status = null,
+    public async Task<PagedResult<EncounterDto>> GetEncountersAsync(
         DateTime? date = null,
+        Guid? doctorId = null,
+        Guid? patientId = null,
+        EncounterStatus? status = null,
+        string? query = null,
         int page = 1,
         int pageSize = 50,
         CancellationToken cancellationToken = default)
@@ -72,20 +42,13 @@ public class ClinicalService : IClinicalService
             .Include(e => e.Patient).ThenInclude(p => p.Allergies)
             .Include(e => e.Doctor).ThenInclude(d => d.User)
             .Include(e => e.Doctor).ThenInclude(d => d.Department)
-            .Include(e => e.SignedByDoctor).ThenInclude(d => d!.User)
+            .Include(e => e.SignedByDoctor).ThenInclude(d => d.User)
             .Include(e => e.Appointment)
             .Include(e => e.Notes)
+            .Include(e => e.VitalSigns)
             .Include(e => e.Diagnoses)
+            .Include(e => e.Prescriptions).ThenInclude(p => p.Items).ThenInclude(i => i.Drug)
             .AsQueryable();
-
-        if (patientId.HasValue && patientId.Value != Guid.Empty)
-            q = q.Where(e => e.PatientId == patientId.Value);
-
-        if (doctorId.HasValue && doctorId.Value != Guid.Empty)
-            q = q.Where(e => e.DoctorId == doctorId.Value);
-
-        if (status.HasValue)
-            q = q.Where(e => e.Status == status.Value);
 
         if (date.HasValue)
         {
@@ -94,47 +57,42 @@ public class ClinicalService : IClinicalService
             q = q.Where(e => e.StartedAt >= dayUtc && e.StartedAt < nextDayUtc);
         }
 
+        if (doctorId.HasValue && doctorId.Value != Guid.Empty)
+        {
+            q = q.Where(e => e.DoctorId == doctorId.Value);
+        }
+
+        if (patientId.HasValue && patientId.Value != Guid.Empty)
+        {
+            q = q.Where(e => e.PatientId == patientId.Value);
+        }
+
+        if (status.HasValue)
+        {
+            q = q.Where(e => e.Status == status.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(query))
+        {
+            var search = query.Trim().ToLower();
+            q = q.Where(e =>
+                e.Patient.PatientNumber.ToLower().Contains(search) ||
+                e.Patient.FirstName.ToLower().Contains(search) ||
+                e.Patient.LastName.ToLower().Contains(search) ||
+                e.Doctor.User.FullName.ToLower().Contains(search) ||
+                (e.Appointment != null && e.Appointment.AppointmentNumber.ToLower().Contains(search)));
+        }
+
         var total = await q.CountAsync(cancellationToken);
 
-        var list = await q
+        var items = await q
             .OrderByDescending(e => e.StartedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
+            .Select(e => MapToEncounterDto(e))
             .ToListAsync(cancellationToken);
 
-        var items = list.Select(e =>
-        {
-            var latestNote = e.Notes.OrderByDescending(n => n.Version).FirstOrDefault();
-            var primaryDiag = e.Diagnoses.FirstOrDefault(d => d.IsPrimary) ?? e.Diagnoses.FirstOrDefault();
-            int age = DateTime.UtcNow.Year - e.Patient.DateOfBirth.Year;
-            if (e.Patient.DateOfBirth.Date > DateTime.UtcNow.AddYears(-age)) age--;
-
-            return new EncounterSummaryDto
-            {
-                Id = e.Id,
-                PatientId = e.PatientId,
-                PatientNumber = e.Patient.PatientNumber,
-                PatientName = $"{e.Patient.FirstName} {e.Patient.LastName}",
-                PatientAge = age,
-                PatientGender = e.Patient.Gender,
-                PatientPhone = e.Patient.Phone,
-                HasHighRiskAllergy = e.Patient.Allergies.Any(a => a.Severity >= 2),
-                DoctorId = e.DoctorId,
-                DoctorName = e.Doctor.User.FullName,
-                DepartmentName = e.Doctor.Department.Name,
-                AppointmentId = e.AppointmentId,
-                AppointmentNumber = e.Appointment?.AppointmentNumber,
-                StartedAt = e.StartedAt,
-                EndedAt = e.EndedAt,
-                Status = e.Status,
-                SignedAt = e.SignedAt,
-                SignedByDoctorName = e.SignedByDoctor?.User.FullName,
-                ChiefComplaint = latestNote?.ChiefComplaint,
-                PrimaryDiagnosis = primaryDiag != null ? $"{primaryDiag.Icd10Code} - {primaryDiag.Description}" : null
-            };
-        }).ToList();
-
-        return new PagedResult<EncounterSummaryDto>
+        return new PagedResult<EncounterDto>
         {
             Total = total,
             Page = page,
@@ -143,41 +101,38 @@ public class ClinicalService : IClinicalService
         };
     }
 
-    public async Task<EncounterDetailDto?> GetEncounterByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task<EncounterDto?> GetEncounterByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var e = await _context.Encounters
             .AsNoTracking()
             .Include(enc => enc.Patient).ThenInclude(p => p.Allergies)
-            .Include(enc => enc.Patient).ThenInclude(p => p.Conditions)
             .Include(enc => enc.Doctor).ThenInclude(d => d.User)
             .Include(enc => enc.Doctor).ThenInclude(d => d.Department)
-            .Include(enc => enc.SignedByDoctor).ThenInclude(d => d!.User)
+            .Include(enc => enc.SignedByDoctor).ThenInclude(d => d.User)
             .Include(enc => enc.Appointment)
             .Include(enc => enc.Notes)
             .Include(enc => enc.VitalSigns).ThenInclude(v => v.RecordedByUser)
             .Include(enc => enc.Diagnoses)
-            .Include(enc => enc.Prescriptions).ThenInclude(p => p.Doctor).ThenInclude(d => d.User)
             .Include(enc => enc.Prescriptions).ThenInclude(p => p.Items).ThenInclude(i => i.Drug)
             .FirstOrDefaultAsync(enc => enc.Id == id, cancellationToken);
 
-        if (e == null) return null;
-
-        return MapToDetailDto(e);
+        return e == null ? null : MapToEncounterDto(e);
     }
 
-    public async Task<EncounterDetailDto> StartEncounterAsync(
+    public async Task<EncounterDto> StartEncounterAsync(
         StartEncounterRequest request,
+        Guid currentUserId,
         string currentUserName,
         CancellationToken cancellationToken = default)
     {
         var patient = await _context.Patients
             .Include(p => p.Allergies)
-            .Include(p => p.Conditions)
             .FirstOrDefaultAsync(p => p.Id == request.PatientId, cancellationToken);
         if (patient == null)
             throw new KeyNotFoundException($"Patient {request.PatientId} not found.");
+
         if (!patient.IsActive)
-            throw new InvalidOperationException($"Patient {patient.PatientNumber} is deactivated.");
+            throw new InvalidOperationException($"Cannot start encounter for deactivated patient {patient.PatientNumber}.");
 
         var doctor = await _context.Doctors
             .Include(d => d.User)
@@ -185,20 +140,14 @@ public class ClinicalService : IClinicalService
             .FirstOrDefaultAsync(d => d.Id == request.DoctorId, cancellationToken);
         if (doctor == null)
             throw new KeyNotFoundException($"Doctor {request.DoctorId} not found.");
-        if (!doctor.IsActive)
-            throw new InvalidOperationException($"Doctor {doctor.User.FullName} is inactive.");
 
         Appointment? appt = null;
         if (request.AppointmentId.HasValue && request.AppointmentId.Value != Guid.Empty)
         {
             appt = await _context.Appointments
                 .FirstOrDefaultAsync(a => a.Id == request.AppointmentId.Value, cancellationToken);
-
             if (appt != null)
             {
-                if (appt.Status == AppointmentStatus.Cancelled)
-                    throw new InvalidOperationException("Cannot start an encounter for a cancelled appointment.");
-
                 appt.Status = AppointmentStatus.InConsultation;
                 appt.UpdatedAt = DateTime.UtcNow;
             }
@@ -216,79 +165,43 @@ public class ClinicalService : IClinicalService
             UpdatedAt = DateTime.UtcNow
         };
 
+        if (!string.IsNullOrWhiteSpace(request.ChiefComplaint))
+        {
+            encounter.Notes.Add(new ClinicalNote
+            {
+                Id = Guid.NewGuid(),
+                EncounterId = encounter.Id,
+                ChiefComplaint = request.ChiefComplaint.Trim(),
+                Version = 1,
+                IsFinalized = false,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            });
+        }
+
         _context.Encounters.Add(encounter);
         await _context.SaveChangesAsync(cancellationToken);
 
         await _auditService.LogAsync(
-            null,
+            currentUserId,
             currentUserName,
             "Encounter.Started",
             "Encounter",
             encounter.Id.ToString(),
-            $"Started clinical encounter for patient {patient.PatientNumber} with doctor {doctor.User.FullName}",
+            $"Started clinical encounter for patient {patient.PatientNumber} ({patient.FirstName} {patient.LastName}) with Dr. {doctor.User.FullName}",
             "127.0.0.1");
 
         encounter.Patient = patient;
         encounter.Doctor = doctor;
         encounter.Appointment = appt;
 
-        return MapToDetailDto(encounter);
+        return MapToEncounterDto(encounter);
     }
 
-    public async Task<VitalSignDto> RecordVitalSignsAsync(
-        Guid encounterId,
-        RecordVitalSignsRequest request,
-        Guid recordedByUserId,
-        string recordedByName,
-        CancellationToken cancellationToken = default)
-    {
-        var encounter = await _context.Encounters
-            .Include(e => e.Patient)
-            .FirstOrDefaultAsync(e => e.Id == encounterId, cancellationToken);
-
-        if (encounter == null)
-            throw new KeyNotFoundException($"Encounter {encounterId} not found.");
-
-        if (encounter.Status == EncounterStatus.Closed)
-            throw new InvalidOperationException("Cannot record vitals for a closed encounter.");
-
-        var vs = new VitalSign
-        {
-            Id = Guid.NewGuid(),
-            EncounterId = encounter.Id,
-            PatientId = encounter.PatientId,
-            RecordedByUserId = recordedByUserId,
-            SystolicBp = request.SystolicBp,
-            DiastolicBp = request.DiastolicBp,
-            HeartRateBpm = request.HeartRateBpm,
-            RespiratoryRateBpm = request.RespiratoryRateBpm,
-            TemperatureCelsius = request.TemperatureCelsius,
-            OxygenSaturationPct = request.OxygenSaturationPct,
-            WeightKg = request.WeightKg,
-            HeightCm = request.HeightCm,
-            RecordedAt = DateTime.UtcNow,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        };
-
-        _context.VitalSigns.Add(vs);
-        await _context.SaveChangesAsync(cancellationToken);
-
-        await _auditService.LogAsync(
-            recordedByUserId,
-            recordedByName,
-            "VitalSigns.Recorded",
-            "VitalSign",
-            vs.Id.ToString(),
-            $"Recorded vitals for patient {encounter.Patient.PatientNumber} in encounter {encounter.Id}",
-            "127.0.0.1");
-
-        return MapVitalSignDto(vs, recordedByName);
-    }
-
-    public async Task<ClinicalNoteDto> SaveClinicalNoteDraftAsync(
+    public async Task<ClinicalNoteDto> SaveClinicalNoteAsync(
         Guid encounterId,
         SaveClinicalNoteRequest request,
+        Guid currentUserId,
         string currentUserName,
         CancellationToken cancellationToken = default)
     {
@@ -300,25 +213,23 @@ public class ClinicalService : IClinicalService
             throw new KeyNotFoundException($"Encounter {encounterId} not found.");
 
         if (encounter.Status == EncounterStatus.Signed || encounter.Status == EncounterStatus.Closed)
-            throw new InvalidOperationException("Encounter is already signed and immutable. Use AddNoteAddendum to record amendments.");
-
-        var activeDraft = encounter.Notes.FirstOrDefault(n => !n.IsFinalized);
-
-        if (activeDraft != null)
         {
-            activeDraft.ChiefComplaint = request.ChiefComplaint.Trim();
-            activeDraft.HistoryOfPresentIllness = request.HistoryOfPresentIllness?.Trim();
-            activeDraft.ExaminationFindings = request.ExaminationFindings?.Trim();
-            activeDraft.Assessment = request.Assessment?.Trim();
-            activeDraft.TreatmentPlan = request.TreatmentPlan?.Trim();
-            activeDraft.UpdatedAt = DateTime.UtcNow;
+            throw new InvalidOperationException("The clinical encounter is already signed and closed. You must create an addendum instead.");
         }
-        else
+
+        var latestNote = encounter.Notes.OrderByDescending(n => n.Version).FirstOrDefault();
+
+        if (latestNote != null && latestNote.IsFinalized)
         {
-            activeDraft = new ClinicalNote
+            throw new InvalidOperationException("This note version has been finalized. Finalized clinical records are immutable. Please create an addendum.");
+        }
+
+        if (latestNote == null)
+        {
+            latestNote = new ClinicalNote
             {
                 Id = Guid.NewGuid(),
-                EncounterId = encounter.Id,
+                EncounterId = encounterId,
                 ChiefComplaint = request.ChiefComplaint.Trim(),
                 HistoryOfPresentIllness = request.HistoryOfPresentIllness?.Trim(),
                 ExaminationFindings = request.ExaminationFindings?.Trim(),
@@ -329,103 +240,40 @@ public class ClinicalService : IClinicalService
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
-            _context.ClinicalNotes.Add(activeDraft);
+            _context.ClinicalNotes.Add(latestNote);
         }
-
-        encounter.Status = EncounterStatus.Draft;
-        encounter.UpdatedAt = DateTime.UtcNow;
-
-        await _context.SaveChangesAsync(cancellationToken);
-
-        await _auditService.LogAsync(
-            null,
-            currentUserName,
-            "ClinicalNote.DraftSaved",
-            "ClinicalNote",
-            activeDraft.Id.ToString(),
-            $"Saved clinical note draft v{activeDraft.Version} for encounter {encounter.Id}",
-            "127.0.0.1");
-
-        return MapClinicalNoteDto(activeDraft);
-    }
-
-    public async Task<EncounterDetailDto> SignEncounterAsync(
-        Guid encounterId,
-        Guid signingDoctorId,
-        string currentUserName,
-        CancellationToken cancellationToken = default)
-    {
-        var encounter = await _context.Encounters
-            .Include(e => e.Patient).ThenInclude(p => p.Allergies)
-            .Include(e => e.Patient).ThenInclude(p => p.Conditions)
-            .Include(e => e.Doctor).ThenInclude(d => d.User)
-            .Include(e => e.Doctor).ThenInclude(d => d.Department)
-            .Include(e => e.Appointment)
-            .Include(e => e.Notes)
-            .Include(e => e.VitalSigns).ThenInclude(v => v.RecordedByUser)
-            .Include(e => e.Diagnoses)
-            .Include(e => e.Prescriptions).ThenInclude(p => p.Doctor).ThenInclude(d => d.User)
-            .Include(e => e.Prescriptions).ThenInclude(p => p.Items).ThenInclude(i => i.Drug)
-            .FirstOrDefaultAsync(e => e.Id == encounterId, cancellationToken);
-
-        if (encounter == null)
-            throw new KeyNotFoundException($"Encounter {encounterId} not found.");
-
-        if (encounter.Status == EncounterStatus.Signed || encounter.Status == EncounterStatus.Closed)
-            throw new InvalidOperationException("Encounter is already signed.");
-
-        var activeNote = encounter.Notes.OrderByDescending(n => n.Version).FirstOrDefault();
-        if (activeNote == null)
-            throw new InvalidOperationException("Cannot sign an encounter without a clinical note.");
-
-        var doctor = await _context.Doctors
-            .Include(d => d.User)
-            .FirstOrDefaultAsync(d => d.Id == signingDoctorId, cancellationToken);
-
-        if (doctor == null)
-            throw new KeyNotFoundException($"Signing doctor {signingDoctorId} not found.");
-
-        activeNote.IsFinalized = true;
-        activeNote.UpdatedAt = DateTime.UtcNow;
-
-        var now = DateTime.UtcNow;
-        encounter.SignedAt = now;
-        encounter.SignedByDoctorId = doctor.Id;
-        encounter.EndedAt = now;
-        encounter.Status = EncounterStatus.Signed;
-        encounter.UpdatedAt = now;
-
-        if (encounter.Appointment != null)
+        else
         {
-            encounter.Appointment.Status = AppointmentStatus.Completed;
-            encounter.Appointment.UpdatedAt = now;
+            latestNote.ChiefComplaint = request.ChiefComplaint.Trim();
+            latestNote.HistoryOfPresentIllness = request.HistoryOfPresentIllness?.Trim();
+            latestNote.ExaminationFindings = request.ExaminationFindings?.Trim();
+            latestNote.Assessment = request.Assessment?.Trim();
+            latestNote.TreatmentPlan = request.TreatmentPlan?.Trim();
+            latestNote.UpdatedAt = DateTime.UtcNow;
         }
 
+        encounter.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync(cancellationToken);
 
         await _auditService.LogAsync(
-            doctor.UserId,
+            currentUserId,
             currentUserName,
-            "Encounter.Signed",
-            "Encounter",
-            encounter.Id.ToString(),
-            $"Doctor {doctor.User.FullName} signed and finalized clinical encounter {encounter.Id}. Note is now immutable.",
+            "ClinicalNote.Saved",
+            "ClinicalNote",
+            latestNote.Id.ToString(),
+            $"Updated draft clinical SOAP note (v{latestNote.Version}) for encounter {encounterId}",
             "127.0.0.1");
 
-        encounter.SignedByDoctor = doctor;
-        return MapToDetailDto(encounter);
+        return MapToNoteDto(latestNote);
     }
 
     public async Task<ClinicalNoteDto> AddNoteAddendumAsync(
         Guid encounterId,
-        AddAddendumRequest request,
-        Guid doctorId,
+        AddNoteAddendumRequest request,
+        Guid currentUserId,
         string currentUserName,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(request.AmendmentReason))
-            throw new ArgumentException("A mandatory amendment reason must be provided.");
-
         var encounter = await _context.Encounters
             .Include(e => e.Notes)
             .FirstOrDefaultAsync(e => e.Id == encounterId, cancellationToken);
@@ -433,26 +281,23 @@ public class ClinicalService : IClinicalService
         if (encounter == null)
             throw new KeyNotFoundException($"Encounter {encounterId} not found.");
 
-        if (encounter.Status != EncounterStatus.Signed && encounter.Status != EncounterStatus.AmendedByAddendum)
-            throw new InvalidOperationException("Addenda can only be appended to signed clinical encounters.");
-
-        var originalNote = encounter.Notes.FirstOrDefault(n => n.Id == request.OriginalNoteId);
+        var originalNote = encounter.Notes.FirstOrDefault(n => n.Id == request.SupersedesNoteId);
         if (originalNote == null)
-            throw new KeyNotFoundException($"Original note {request.OriginalNoteId} was not found.");
+            throw new KeyNotFoundException($"Original note {request.SupersedesNoteId} not found in encounter.");
 
-        int nextVersion = encounter.Notes.Max(n => n.Version) + 1;
+        var maxVersion = encounter.Notes.Max(n => n.Version);
 
         var addendumNote = new ClinicalNote
         {
             Id = Guid.NewGuid(),
-            EncounterId = encounter.Id,
+            EncounterId = encounterId,
             ChiefComplaint = request.ChiefComplaint.Trim(),
             HistoryOfPresentIllness = request.HistoryOfPresentIllness?.Trim(),
             ExaminationFindings = request.ExaminationFindings?.Trim(),
             Assessment = request.Assessment?.Trim(),
             TreatmentPlan = request.TreatmentPlan?.Trim(),
-            Version = nextVersion,
-            IsFinalized = true,
+            Version = maxVersion + 1,
+            IsFinalized = true, // Addenda are immediately finalized
             SupersedesNoteId = originalNote.Id,
             AmendmentReason = request.AmendmentReason.Trim(),
             CreatedAt = DateTime.UtcNow,
@@ -466,20 +311,72 @@ public class ClinicalService : IClinicalService
         await _context.SaveChangesAsync(cancellationToken);
 
         await _auditService.LogAsync(
-            null,
+            currentUserId,
             currentUserName,
             "ClinicalNote.AddendumAdded",
             "ClinicalNote",
             addendumNote.Id.ToString(),
-            $"Added note addendum v{addendumNote.Version} to encounter {encounter.Id}. Reason: {request.AmendmentReason}",
+            $"Added note addendum (v{addendumNote.Version}) superseding note {originalNote.Id}. Reason: {request.AmendmentReason}",
             "127.0.0.1");
 
-        return MapClinicalNoteDto(addendumNote);
+        return MapToNoteDto(addendumNote);
+    }
+
+    public async Task<VitalSignDto> RecordVitalSignsAsync(
+        Guid encounterId,
+        RecordVitalSignsRequest request,
+        Guid currentUserId,
+        string currentUserName,
+        CancellationToken cancellationToken = default)
+    {
+        var encounter = await _context.Encounters
+            .FirstOrDefaultAsync(e => e.Id == encounterId, cancellationToken);
+
+        if (encounter == null)
+            throw new KeyNotFoundException($"Encounter {encounterId} not found.");
+
+        var vital = new VitalSign
+        {
+            Id = Guid.NewGuid(),
+            EncounterId = encounterId,
+            PatientId = encounter.PatientId,
+            RecordedByUserId = currentUserId,
+            SystolicBp = request.SystolicBp,
+            DiastolicBp = request.DiastolicBp,
+            HeartRateBpm = request.HeartRateBpm,
+            RespiratoryRateBpm = request.RespiratoryRateBpm,
+            TemperatureCelsius = request.TemperatureCelsius,
+            OxygenSaturationPct = request.OxygenSaturationPct,
+            WeightKg = request.WeightKg,
+            HeightCm = request.HeightCm,
+            RecordedAt = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        _context.VitalSigns.Add(vital);
+        encounter.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync(cancellationToken);
+
+        var user = await _context.UserAccounts.FirstOrDefaultAsync(u => u.Id == currentUserId, cancellationToken);
+        vital.RecordedByUser = user!;
+
+        await _auditService.LogAsync(
+            currentUserId,
+            currentUserName,
+            "VitalSigns.Recorded",
+            "VitalSign",
+            vital.Id.ToString(),
+            $"Recorded vitals for encounter {encounterId}: BP {vital.SystolicBp}/{vital.DiastolicBp}, HR {vital.HeartRateBpm}, SpO2 {vital.OxygenSaturationPct}%",
+            "127.0.0.1");
+
+        return MapToVitalDto(vital);
     }
 
     public async Task<DiagnosisDto> AddDiagnosisAsync(
         Guid encounterId,
         AddDiagnosisRequest request,
+        Guid currentUserId,
         string currentUserName,
         CancellationToken cancellationToken = default)
     {
@@ -492,70 +389,64 @@ public class ClinicalService : IClinicalService
 
         if (request.IsPrimary)
         {
-            foreach (var d in encounter.Diagnoses)
+            foreach (var d in encounter.Diagnoses.Where(d => d.IsPrimary))
             {
                 d.IsPrimary = false;
+                d.UpdatedAt = DateTime.UtcNow;
             }
         }
 
         var diagnosis = new Diagnosis
         {
             Id = Guid.NewGuid(),
-            EncounterId = encounter.Id,
+            EncounterId = encounterId,
             PatientId = encounter.PatientId,
-            Icd10Code = request.Icd10Code?.Trim().ToUpperInvariant(),
+            Icd10Code = request.Icd10Code?.Trim().ToUpper(),
             Description = request.Description.Trim(),
-            IsPrimary = request.IsPrimary,
+            IsPrimary = request.IsPrimary || !encounter.Diagnoses.Any(),
             RecordedAt = DateTime.UtcNow,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
 
         _context.Diagnoses.Add(diagnosis);
+        encounter.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync(cancellationToken);
 
         await _auditService.LogAsync(
-            null,
+            currentUserId,
             currentUserName,
             "Diagnosis.Added",
             "Diagnosis",
             diagnosis.Id.ToString(),
-            $"Recorded diagnosis '{diagnosis.Description}' ({diagnosis.Icd10Code}) for encounter {encounter.Id}",
+            $"Added diagnosis '{diagnosis.Description}' (ICD-10: {diagnosis.Icd10Code ?? "N/A"}) - Primary: {diagnosis.IsPrimary}",
             "127.0.0.1");
 
-        return new DiagnosisDto
-        {
-            Id = diagnosis.Id,
-            EncounterId = diagnosis.EncounterId,
-            PatientId = diagnosis.PatientId,
-            Icd10Code = diagnosis.Icd10Code,
-            Description = diagnosis.Description,
-            IsPrimary = diagnosis.IsPrimary,
-            RecordedAt = diagnosis.RecordedAt
-        };
+        return MapToDiagnosisDto(diagnosis);
     }
 
     public async Task<bool> RemoveDiagnosisAsync(
         Guid encounterId,
         Guid diagnosisId,
+        Guid currentUserId,
         string currentUserName,
         CancellationToken cancellationToken = default)
     {
-        var diagnosis = await _context.Diagnoses
+        var diag = await _context.Diagnoses
             .FirstOrDefaultAsync(d => d.Id == diagnosisId && d.EncounterId == encounterId, cancellationToken);
 
-        if (diagnosis == null) return false;
+        if (diag == null) return false;
 
-        _context.Diagnoses.Remove(diagnosis);
+        _context.Diagnoses.Remove(diag);
         await _context.SaveChangesAsync(cancellationToken);
 
         await _auditService.LogAsync(
-            null,
+            currentUserId,
             currentUserName,
             "Diagnosis.Removed",
             "Diagnosis",
-            diagnosis.Id.ToString(),
-            $"Removed diagnosis '{diagnosis.Description}' from encounter {encounterId}",
+            diagnosisId.ToString(),
+            $"Removed diagnosis '{diag.Description}' from encounter {encounterId}",
             "127.0.0.1");
 
         return true;
@@ -564,220 +455,269 @@ public class ClinicalService : IClinicalService
     public async Task<PrescriptionDto> CreatePrescriptionAsync(
         Guid encounterId,
         CreatePrescriptionRequest request,
-        Guid doctorId,
+        Guid currentUserId,
         string currentUserName,
         CancellationToken cancellationToken = default)
     {
         var encounter = await _context.Encounters
-            .Include(e => e.Patient)
+            .Include(e => e.Patient).ThenInclude(p => p.Allergies)
+            .Include(e => e.Doctor).ThenInclude(d => d.User)
             .FirstOrDefaultAsync(e => e.Id == encounterId, cancellationToken);
 
         if (encounter == null)
             throw new KeyNotFoundException($"Encounter {encounterId} not found.");
 
-        var doctor = await _context.Doctors
-            .Include(d => d.User)
-            .FirstOrDefaultAsync(d => d.Id == doctorId, cancellationToken);
-
-        if (doctor == null)
-            throw new KeyNotFoundException($"Doctor {doctorId} not found.");
-
-        var rxNumber = await _prescriptionNumberGenerator.GenerateNextPrescriptionNumberAsync(cancellationToken);
-
-        var prescription = new Prescription
+        await _rxLock.WaitAsync(cancellationToken);
+        try
         {
-            Id = Guid.NewGuid(),
-            PrescriptionNumber = rxNumber,
-            EncounterId = encounter.Id,
-            PatientId = encounter.PatientId,
-            DoctorId = doctor.Id,
-            SignedAt = DateTime.UtcNow,
-            Status = PrescriptionStatus.Signed,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        };
+            var year = DateTime.UtcNow.Year;
+            var prefix = $"RX-{year}-";
 
-        foreach (var itemReq in request.Items)
-        {
-            var drug = await _context.Drugs.FirstOrDefaultAsync(d => d.Id == itemReq.DrugId, cancellationToken);
-            if (drug == null)
-                throw new KeyNotFoundException($"Drug {itemReq.DrugId} not found in catalog.");
+            var existingRxNumbers = await _context.Prescriptions
+                .AsNoTracking()
+                .Where(p => p.PrescriptionNumber.StartsWith(prefix))
+                .Select(p => p.PrescriptionNumber)
+                .ToListAsync(cancellationToken);
 
-            var item = new PrescriptionItem
+            int highestSeq = 0;
+            foreach (var num in existingRxNumbers)
+            {
+                var suffix = num.Substring(prefix.Length);
+                if (int.TryParse(suffix, out int parsed) && parsed > highestSeq)
+                    highestSeq = parsed;
+            }
+
+            var nextRxNumber = $"{prefix}{(highestSeq + 1):D5}";
+
+            var prescription = new Prescription
             {
                 Id = Guid.NewGuid(),
-                PrescriptionId = prescription.Id,
-                DrugId = drug.Id,
-                Dosage = itemReq.Dosage.Trim(),
-                Frequency = itemReq.Frequency.Trim(),
-                Route = itemReq.Route.Trim(),
-                DurationDays = itemReq.DurationDays,
-                QuantityPrescribed = itemReq.QuantityPrescribed,
-                Instructions = itemReq.Instructions?.Trim(),
+                PrescriptionNumber = nextRxNumber,
+                EncounterId = encounterId,
+                PatientId = encounter.PatientId,
+                DoctorId = encounter.DoctorId,
+                SignedAt = DateTime.UtcNow,
+                Status = PrescriptionStatus.Signed,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
-            prescription.Items.Add(item);
+
+            // Process Items and check against allergies
+            var drugIds = request.Items.Select(i => i.DrugId).Distinct().ToList();
+            var drugs = await _context.Drugs
+                .Where(d => drugIds.Contains(d.Id))
+                .ToDictionaryAsync(d => d.Id, cancellationToken);
+
+            var allergyWarnings = new List<string>();
+
+            foreach (var item in request.Items)
+            {
+                if (!drugs.TryGetValue(item.DrugId, out var drug))
+                    throw new KeyNotFoundException($"Drug ID {item.DrugId} not found in hospital formulary.");
+
+                // Allergy conflict cross-check
+                foreach (var allergy in encounter.Patient.Allergies)
+                {
+                    if (drug.GenericName.Contains(allergy.Allergen, StringComparison.OrdinalIgnoreCase) ||
+                        drug.BrandName.Contains(allergy.Allergen, StringComparison.OrdinalIgnoreCase) ||
+                        allergy.Allergen.Contains(drug.GenericName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        var warning = $"ALLERGY ALERT: Patient is documented allergic to '{allergy.Allergen}'. Prescribed: {drug.BrandName} ({drug.GenericName}).";
+                        allergyWarnings.Add(warning);
+                        _logger.LogWarning(warning);
+                    }
+                }
+
+                prescription.Items.Add(new PrescriptionItem
+                {
+                    Id = Guid.NewGuid(),
+                    PrescriptionId = prescription.Id,
+                    DrugId = drug.Id,
+                    Dosage = item.Dosage.Trim(),
+                    Frequency = item.Frequency.Trim(),
+                    Route = string.IsNullOrWhiteSpace(item.Route) ? "Oral" : item.Route.Trim(),
+                    DurationDays = item.DurationDays > 0 ? item.DurationDays : 7,
+                    QuantityPrescribed = item.QuantityPrescribed > 0 ? item.QuantityPrescribed : 1,
+                    QuantityDispensed = 0,
+                    Instructions = item.Instructions?.Trim(),
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                });
+            }
+
+            _context.Prescriptions.Add(prescription);
+            encounter.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync(cancellationToken);
+
+            var auditDetail = $"Issued electronic prescription {prescription.PrescriptionNumber} with {prescription.Items.Count} item(s).";
+            if (allergyWarnings.Any())
+            {
+                auditDetail += " " + string.Join(" ", allergyWarnings);
+            }
+
+            await _auditService.LogAsync(
+                currentUserId,
+                currentUserName,
+                "Prescription.Created",
+                "Prescription",
+                prescription.Id.ToString(),
+                auditDetail,
+                "127.0.0.1");
+
+            prescription.Doctor = encounter.Doctor;
+            prescription.Patient = encounter.Patient;
+
+            return MapToPrescriptionDto(prescription);
+        }
+        finally
+        {
+            _rxLock.Release();
+        }
+    }
+
+    public async Task<EncounterDto> SignAndCloseEncounterAsync(
+        Guid encounterId,
+        Guid currentUserId,
+        string currentUserName,
+        CancellationToken cancellationToken = default)
+    {
+        var encounter = await _context.Encounters
+            .Include(e => e.Patient).ThenInclude(p => p.Allergies)
+            .Include(e => e.Doctor).ThenInclude(d => d.User)
+            .Include(e => e.Doctor).ThenInclude(d => d.Department)
+            .Include(e => e.Appointment)
+            .Include(e => e.Notes)
+            .Include(e => e.VitalSigns).ThenInclude(v => v.RecordedByUser)
+            .Include(e => e.Diagnoses)
+            .Include(e => e.Prescriptions).ThenInclude(p => p.Items).ThenInclude(i => i.Drug)
+            .FirstOrDefaultAsync(e => e.Id == encounterId, cancellationToken);
+
+        if (encounter == null)
+            throw new KeyNotFoundException($"Encounter {encounterId} not found.");
+
+        if (encounter.Status == EncounterStatus.Signed || encounter.Status == EncounterStatus.Closed)
+        {
+            throw new InvalidOperationException("Encounter has already been signed and closed.");
         }
 
-        _context.Prescriptions.Add(prescription);
+        // Finalize all draft notes
+        foreach (var note in encounter.Notes.Where(n => !n.IsFinalized))
+        {
+            note.IsFinalized = true;
+            note.UpdatedAt = DateTime.UtcNow;
+        }
+
+        encounter.Status = EncounterStatus.Signed;
+        encounter.SignedAt = DateTime.UtcNow;
+        encounter.SignedByDoctorId = encounter.DoctorId;
+        encounter.EndedAt = DateTime.UtcNow;
+        encounter.UpdatedAt = DateTime.UtcNow;
+
+        if (encounter.Appointment != null)
+        {
+            encounter.Appointment.Status = AppointmentStatus.Completed;
+            encounter.Appointment.UpdatedAt = DateTime.UtcNow;
+        }
+
         await _context.SaveChangesAsync(cancellationToken);
 
         await _auditService.LogAsync(
-            doctor.UserId,
+            currentUserId,
             currentUserName,
-            "Prescription.Created",
-            "Prescription",
-            prescription.Id.ToString(),
-            $"Issued prescription {rxNumber} with {prescription.Items.Count} item(s) for patient {encounter.Patient.PatientNumber}",
+            "Encounter.SignedAndClosed",
+            "Encounter",
+            encounter.Id.ToString(),
+            $"Doctor {currentUserName} signed and finalized encounter {encounterId}. All clinical notes sealed.",
             "127.0.0.1");
 
-        prescription.Doctor = doctor;
-        return MapPrescriptionDto(prescription);
+        return MapToEncounterDto(encounter);
     }
 
-    public Task<List<Icd10LookupDto>> GetIcd10CatalogAsync(
-        string? query = null,
-        CancellationToken cancellationToken = default)
+    public Task<List<Icd10CatalogItemDto>> GetStandardIcd10CatalogAsync(string? search = null)
     {
-        if (string.IsNullOrWhiteSpace(query))
+        var catalog = new List<Icd10CatalogItemDto>
         {
-            return Task.FromResult(StandardIcd10Catalog);
-        }
-
-        var search = query.Trim().ToLowerInvariant();
-        var matches = StandardIcd10Catalog
-            .Where(c => c.Code.ToLowerInvariant().Contains(search) || c.Description.ToLowerInvariant().Contains(search) || c.Category.ToLowerInvariant().Contains(search))
-            .ToList();
-
-        return Task.FromResult(matches);
-    }
-
-    public async Task<List<Drug>> GetEssentialDrugsAsync(
-        string? query = null,
-        CancellationToken cancellationToken = default)
-    {
-        var q = _context.Drugs.AsNoTracking().AsQueryable();
-        if (!string.IsNullOrWhiteSpace(query))
-        {
-            var search = query.Trim().ToLower();
-            q = q.Where(d => d.GenericName.ToLower().Contains(search) || d.BrandName.ToLower().Contains(search) || d.Code.ToLower().Contains(search));
-        }
-
-        return await q.OrderBy(d => d.GenericName).ToListAsync(cancellationToken);
-    }
-
-    private static EncounterDetailDto MapToDetailDto(Encounter e)
-    {
-        int age = DateTime.UtcNow.Year - e.Patient.DateOfBirth.Year;
-        if (e.Patient.DateOfBirth.Date > DateTime.UtcNow.AddYears(-age)) age--;
-
-        var patDto = new PatientDto(
-            e.Patient.Id,
-            e.Patient.PatientNumber,
-            e.Patient.FirstName,
-            e.Patient.LastName,
-            $"{e.Patient.FirstName} {e.Patient.LastName}",
-            e.Patient.DateOfBirth,
-            age,
-            e.Patient.Gender,
-            e.Patient.BloodGroup,
-            e.Patient.Phone,
-            e.Patient.Email,
-            e.Patient.Address,
-            e.Patient.EmergencyContactName,
-            e.Patient.EmergencyContactPhone,
-            e.Patient.IsActive,
-            e.Patient.Allergies?.Count ?? 0,
-            e.Patient.Allergies?.Any(a => a.Severity >= 2) ?? false,
-            e.Patient.CreatedAt,
-            e.Patient.UpdatedAt
-        );
-
-        var docDto = new DoctorDto
-        {
-            Id = e.Doctor.Id,
-            UserId = e.Doctor.UserId,
-            FullName = e.Doctor.User?.FullName ?? "Unknown Doctor",
-            Email = e.Doctor.User?.Email ?? string.Empty,
-            DepartmentId = e.Doctor.DepartmentId,
-            DepartmentName = e.Doctor.Department?.Name ?? string.Empty,
-            DepartmentCode = e.Doctor.Department?.Code ?? string.Empty,
-            LicenseNumber = e.Doctor.LicenseNumber,
-            Specialization = e.Doctor.Specialization,
-            ConsultationFee = e.Doctor.ConsultationFee,
-            IsActive = e.Doctor.IsActive
+            new() { Code = "I10", Description = "Essential (primary) hypertension", Category = "Cardiovascular" },
+            new() { Code = "E11.9", Description = "Type 2 diabetes mellitus without complications", Category = "Endocrine" },
+            new() { Code = "J45.909", Description = "Unspecified asthma, uncomplicated", Category = "Respiratory" },
+            new() { Code = "J06.9", Description = "Acute upper respiratory infection, unspecified", Category = "Infectious" },
+            new() { Code = "J18.9", Description = "Pneumonia, unspecified organism", Category = "Respiratory" },
+            new() { Code = "K21.9", Description = "Gastro-esophageal reflux disease without esophagitis", Category = "Gastrointestinal" },
+            new() { Code = "M54.5", Description = "Low back pain", Category = "Musculoskeletal" },
+            new() { Code = "N39.0", Description = "Urinary tract infection, site not specified", Category = "Genitourinary" },
+            new() { Code = "G43.909", Description = "Migraine, unspecified, not intractable", Category = "Neurological" },
+            new() { Code = "K52.9", Description = "Noninfective gastroenteritis and colitis, unspecified", Category = "Gastrointestinal" },
+            new() { Code = "R50.9", Description = "Fever, unspecified", Category = "General" },
+            new() { Code = "R05", Description = "Cough", Category = "Respiratory" },
+            new() { Code = "R07.9", Description = "Chest pain, unspecified", Category = "Cardiovascular" },
+            new() { Code = "R10.9", Description = "Abdominal pain, unspecified", Category = "Gastrointestinal" },
+            new() { Code = "Z00.00", Description = "Encounter for general adult medical examination", Category = "Preventative" }
         };
 
-        AppointmentDto? apptDto = null;
-        if (e.Appointment != null)
+        if (!string.IsNullOrWhiteSpace(search))
         {
-            apptDto = new AppointmentDto
-            {
-                Id = e.Appointment.Id,
-                AppointmentNumber = e.Appointment.AppointmentNumber,
-                PatientId = e.Appointment.PatientId,
-                PatientNumber = e.Patient.PatientNumber,
-                PatientName = $"{e.Patient.FirstName} {e.Patient.LastName}",
-                PatientPhone = e.Patient.Phone,
-                DoctorId = e.Appointment.DoctorId,
-                DoctorName = docDto.FullName,
-                Specialization = docDto.Specialization,
-                DepartmentId = e.Appointment.DepartmentId,
-                DepartmentName = docDto.DepartmentName,
-                StartsAt = e.Appointment.StartsAt,
-                EndsAt = e.Appointment.EndsAt,
-                Status = e.Appointment.Status,
-                Reason = e.Appointment.Reason,
-                CreatedAt = e.Appointment.CreatedAt
-            };
+            var s = search.Trim().ToLower();
+            catalog = catalog.Where(c =>
+                c.Code.ToLower().Contains(s) ||
+                c.Description.ToLower().Contains(s) ||
+                c.Category.ToLower().Contains(s)).ToList();
         }
 
-        return new EncounterDetailDto
+        return Task.FromResult(catalog);
+    }
+
+    public async Task<List<Drug>> GetFormularyDrugsAsync(CancellationToken cancellationToken = default)
+    {
+        return await _context.Drugs
+            .AsNoTracking()
+            .OrderBy(d => d.BrandName)
+            .ToListAsync(cancellationToken);
+    }
+
+    // Mapping Helpers
+    private static EncounterDto MapToEncounterDto(Encounter e)
+    {
+        var patientAge = 0;
+        if (e.Patient != null)
+        {
+            var today = DateTime.UtcNow.Date;
+            patientAge = today.Year - e.Patient.DateOfBirth.Year;
+            if (e.Patient.DateOfBirth.Date > today.AddYears(-patientAge)) patientAge--;
+        }
+
+        return new EncounterDto
         {
             Id = e.Id,
-            Patient = patDto,
-            Doctor = docDto,
-            Appointment = apptDto,
+            PatientId = e.PatientId,
+            PatientNumber = e.Patient?.PatientNumber ?? string.Empty,
+            PatientName = e.Patient != null ? $"{e.Patient.FirstName} {e.Patient.LastName}" : string.Empty,
+            PatientAge = patientAge,
+            PatientGender = e.Patient?.Gender ?? string.Empty,
+            PatientBloodGroup = e.Patient?.BloodGroup,
+            PatientHasHighRiskAllergy = e.Patient?.Allergies.Any(a => a.Severity >= AllergySeverity.Severe) ?? false,
+            PatientAllergies = e.Patient?.Allergies.Select(a => $"{a.Allergen} ({a.Severity})").ToList() ?? new(),
+            AppointmentId = e.AppointmentId,
+            AppointmentNumber = e.Appointment?.AppointmentNumber,
+            DoctorId = e.DoctorId,
+            DoctorName = e.Doctor?.User?.FullName ?? "Unknown Doctor",
+            Specialization = e.Doctor?.Specialization ?? string.Empty,
+            DepartmentName = e.Doctor?.Department?.Name ?? string.Empty,
             StartedAt = e.StartedAt,
             EndedAt = e.EndedAt,
             Status = e.Status,
             SignedAt = e.SignedAt,
+            SignedByDoctorId = e.SignedByDoctorId,
             SignedByDoctorName = e.SignedByDoctor?.User?.FullName,
-            Notes = e.Notes.OrderBy(n => n.Version).Select(n => MapClinicalNoteDto(n)).ToList(),
-            VitalSigns = e.VitalSigns.OrderByDescending(v => v.RecordedAt).Select(v => MapVitalSignDto(v, v.RecordedByUser?.FullName ?? "Staff")).ToList(),
-            Diagnoses = e.Diagnoses.OrderByDescending(d => d.IsPrimary).ThenBy(d => d.RecordedAt).Select(d => new DiagnosisDto
-            {
-                Id = d.Id,
-                EncounterId = d.EncounterId,
-                PatientId = d.PatientId,
-                Icd10Code = d.Icd10Code,
-                Description = d.Description,
-                IsPrimary = d.IsPrimary,
-                RecordedAt = d.RecordedAt
-            }).ToList(),
-            Prescriptions = e.Prescriptions.OrderByDescending(p => p.CreatedAt).Select(p => MapPrescriptionDto(p)).ToList(),
-            Allergies = e.Patient.Allergies?.Select(a => new PatientAllergyDto(
-                a.Id,
-                a.PatientId,
-                a.Allergen,
-                a.Reaction,
-                a.Severity,
-                a.RecordedAt,
-                a.CreatedAt
-            )).ToList() ?? new(),
-            ChronicConditions = e.Patient.Conditions?.Select(c => new PatientConditionDto(
-                c.Id,
-                c.PatientId,
-                c.ConditionName,
-                c.Status,
-                c.DiagnosedDate,
-                c.CreatedAt
-            )).ToList() ?? new()
+            Notes = e.Notes.OrderBy(n => n.Version).Select(n => MapToNoteDto(n)).ToList(),
+            VitalSigns = e.VitalSigns.OrderByDescending(v => v.RecordedAt).Select(v => MapToVitalDto(v)).ToList(),
+            Diagnoses = e.Diagnoses.OrderByDescending(d => d.IsPrimary).Select(d => MapToDiagnosisDto(d)).ToList(),
+            Prescriptions = e.Prescriptions.OrderByDescending(p => p.CreatedAt).Select(p => MapToPrescriptionDto(p)).ToList(),
+            CreatedAt = e.CreatedAt,
+            UpdatedAt = e.UpdatedAt
         };
     }
 
-    private static ClinicalNoteDto MapClinicalNoteDto(ClinicalNote n)
+    private static ClinicalNoteDto MapToNoteDto(ClinicalNote n)
     {
         return new ClinicalNoteDto
         {
@@ -797,52 +737,123 @@ public class ClinicalService : IClinicalService
         };
     }
 
-    private static VitalSignDto MapVitalSignDto(VitalSign v, string recordedByName)
+    private static VitalSignDto MapToVitalDto(VitalSign v)
     {
         var alerts = new List<string>();
+        bool isAbnormal = false;
 
-        if (v.SystolicBp.HasValue && v.DiastolicBp.HasValue)
+        // Blood pressure evaluation
+        string? bpCat = null;
+        if (v.SystolicBp.HasValue || v.DiastolicBp.HasValue)
         {
-            if (v.SystolicBp.Value >= 140 || v.DiastolicBp.Value >= 90)
-                alerts.Add($"Elevated Blood Pressure ({v.SystolicBp}/{v.DiastolicBp} mmHg)");
-            else if (v.SystolicBp.Value < 90 || v.DiastolicBp.Value < 60)
-                alerts.Add($"Low Blood Pressure ({v.SystolicBp}/{v.DiastolicBp} mmHg)");
+            int sys = v.SystolicBp ?? 0;
+            int dia = v.DiastolicBp ?? 0;
+
+            if (sys >= 180 || dia >= 120)
+            {
+                bpCat = "Hypertensive Crisis";
+                isAbnormal = true;
+                alerts.Add($"Hypertensive Crisis ({sys}/{dia} mmHg)");
+            }
+            else if (sys >= 140 || dia >= 90)
+            {
+                bpCat = "Stage 2 Hypertension";
+                isAbnormal = true;
+                alerts.Add($"Stage 2 HTN ({sys}/{dia} mmHg)");
+            }
+            else if (sys >= 130 || dia >= 80)
+            {
+                bpCat = "Stage 1 Hypertension";
+                isAbnormal = true;
+                alerts.Add($"Stage 1 HTN ({sys}/{dia} mmHg)");
+            }
+            else if (sys >= 120 && dia < 80)
+            {
+                bpCat = "Elevated";
+            }
+            else if ((sys < 90 || dia < 60) && (sys > 0 || dia > 0))
+            {
+                bpCat = "Hypotension";
+                isAbnormal = true;
+                alerts.Add($"Hypotension ({sys}/{dia} mmHg)");
+            }
+            else
+            {
+                bpCat = "Normal";
+            }
         }
 
+        // Heart rate evaluation
         if (v.HeartRateBpm.HasValue)
         {
             if (v.HeartRateBpm.Value > 100)
-                alerts.Add($"Tachycardia ({v.HeartRateBpm} bpm)");
+            {
+                isAbnormal = true;
+                alerts.Add($"Tachycardia ({v.HeartRateBpm.Value} bpm)");
+            }
             else if (v.HeartRateBpm.Value < 60)
-                alerts.Add($"Bradycardia ({v.HeartRateBpm} bpm)");
+            {
+                isAbnormal = true;
+                alerts.Add($"Bradycardia ({v.HeartRateBpm.Value} bpm)");
+            }
         }
 
-        if (v.RespiratoryRateBpm.HasValue)
-        {
-            if (v.RespiratoryRateBpm.Value > 20)
-                alerts.Add($"Tachypnea ({v.RespiratoryRateBpm} breaths/min)");
-            else if (v.RespiratoryRateBpm.Value < 12)
-                alerts.Add($"Bradypnea ({v.RespiratoryRateBpm} breaths/min)");
-        }
-
+        // Temperature evaluation
         if (v.TemperatureCelsius.HasValue)
         {
             if (v.TemperatureCelsius.Value >= 38.0m)
-                alerts.Add($"Fever ({v.TemperatureCelsius.Value:F1} °C)");
-            else if (v.TemperatureCelsius.Value < 36.0m)
-                alerts.Add($"Hypothermia ({v.TemperatureCelsius.Value:F1} °C)");
+            {
+                isAbnormal = true;
+                alerts.Add($"Fever ({v.TemperatureCelsius.Value:F1}°C)");
+            }
+            else if (v.TemperatureCelsius.Value < 35.5m)
+            {
+                isAbnormal = true;
+                alerts.Add($"Hypothermia ({v.TemperatureCelsius.Value:F1}°C)");
+            }
         }
 
-        if (v.OxygenSaturationPct.HasValue && v.OxygenSaturationPct.Value < 95.0m)
+        // SpO2 evaluation
+        if (v.OxygenSaturationPct.HasValue)
         {
-            alerts.Add($"Hypoxia Alert ({v.OxygenSaturationPct.Value:F1}%)");
+            if (v.OxygenSaturationPct.Value < 90m)
+            {
+                isAbnormal = true;
+                alerts.Add($"Critical Hypoxemia ({v.OxygenSaturationPct.Value:F0}%)");
+            }
+            else if (v.OxygenSaturationPct.Value < 95m)
+            {
+                isAbnormal = true;
+                alerts.Add($"Hypoxemia ({v.OxygenSaturationPct.Value:F0}%)");
+            }
         }
 
+        // Respiratory rate
+        if (v.RespiratoryRateBpm.HasValue)
+        {
+            if (v.RespiratoryRateBpm.Value > 20)
+            {
+                isAbnormal = true;
+                alerts.Add($"Tachypnea ({v.RespiratoryRateBpm.Value}/min)");
+            }
+            else if (v.RespiratoryRateBpm.Value < 12)
+            {
+                isAbnormal = true;
+                alerts.Add($"Bradypnea ({v.RespiratoryRateBpm.Value}/min)");
+            }
+        }
+
+        // BMI Calculation
         decimal? bmi = null;
+        string? bmiCat = null;
         if (v.WeightKg.HasValue && v.HeightCm.HasValue && v.HeightCm.Value > 0)
         {
-            var heightM = v.HeightCm.Value / 100.0m;
-            bmi = Math.Round(v.WeightKg.Value / (heightM * heightM), 1);
+            var hMeters = v.HeightCm.Value / 100m;
+            bmi = Math.Round(v.WeightKg.Value / (hMeters * hMeters), 1);
+            if (bmi < 18.5m) bmiCat = "Underweight";
+            else if (bmi < 25.0m) bmiCat = "Normal";
+            else if (bmi < 30.0m) bmiCat = "Overweight";
+            else bmiCat = "Obese";
         }
 
         return new VitalSignDto
@@ -851,7 +862,7 @@ public class ClinicalService : IClinicalService
             EncounterId = v.EncounterId,
             PatientId = v.PatientId,
             RecordedByUserId = v.RecordedByUserId,
-            RecordedByName = recordedByName,
+            RecordedByUserName = v.RecordedByUser?.FullName ?? "Staff",
             SystolicBp = v.SystolicBp,
             DiastolicBp = v.DiastolicBp,
             HeartRateBpm = v.HeartRateBpm,
@@ -860,13 +871,31 @@ public class ClinicalService : IClinicalService
             OxygenSaturationPct = v.OxygenSaturationPct,
             WeightKg = v.WeightKg,
             HeightCm = v.HeightCm,
+            BpCategory = bpCat,
             Bmi = bmi,
+            BmiCategory = bmiCat,
+            IsAbnormal = isAbnormal,
             AbnormalAlerts = alerts,
-            RecordedAt = v.RecordedAt
+            RecordedAt = v.RecordedAt,
+            CreatedAt = v.CreatedAt
         };
     }
 
-    private static PrescriptionDto MapPrescriptionDto(Prescription p)
+    private static DiagnosisDto MapToDiagnosisDto(Diagnosis d)
+    {
+        return new DiagnosisDto
+        {
+            Id = d.Id,
+            EncounterId = d.EncounterId,
+            PatientId = d.PatientId,
+            Icd10Code = d.Icd10Code,
+            Description = d.Description,
+            IsPrimary = d.IsPrimary,
+            RecordedAt = d.RecordedAt
+        };
+    }
+
+    private static PrescriptionDto MapToPrescriptionDto(Prescription p)
     {
         return new PrescriptionDto
         {
@@ -874,22 +903,27 @@ public class ClinicalService : IClinicalService
             PrescriptionNumber = p.PrescriptionNumber,
             EncounterId = p.EncounterId,
             PatientId = p.PatientId,
+            PatientName = p.Patient != null ? $"{p.Patient.FirstName} {p.Patient.LastName}" : string.Empty,
             DoctorId = p.DoctorId,
-            DoctorName = p.Doctor?.User?.FullName ?? "Unknown Physician",
+            DoctorName = p.Doctor?.User?.FullName ?? "Physician",
             SignedAt = p.SignedAt,
             Status = p.Status,
             Items = p.Items.Select(i => new PrescriptionItemDto
             {
                 Id = i.Id,
+                PrescriptionId = i.PrescriptionId,
                 DrugId = i.DrugId,
-                DrugName = i.Drug != null ? $"{i.Drug.GenericName} ({i.Drug.BrandName})" : "Medication",
+                DrugName = i.Drug?.BrandName ?? "Medication",
+                DrugCode = i.Drug?.Code ?? string.Empty,
                 Dosage = i.Dosage,
                 Frequency = i.Frequency,
                 Route = i.Route,
                 DurationDays = i.DurationDays,
                 QuantityPrescribed = i.QuantityPrescribed,
+                QuantityDispensed = i.QuantityDispensed,
                 Instructions = i.Instructions
-            }).ToList()
+            }).ToList(),
+            CreatedAt = p.CreatedAt
         };
     }
 }

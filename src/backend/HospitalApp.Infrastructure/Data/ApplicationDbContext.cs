@@ -29,7 +29,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<Drug> Drugs => Set<Drug>();
     public DbSet<InventoryBatch> InventoryBatches => Set<InventoryBatch>();
     public DbSet<Prescription> Prescriptions => Set<Prescription>();
-    public DbSet<PrescriptionItem> PrescriptionItem => Set<PrescriptionItem>();
+    public DbSet<PrescriptionItem> PrescriptionItems => Set<PrescriptionItem>();
+    public DbSet<PrescriptionItem> PrescriptionItem => PrescriptionItems;
     public DbSet<DispenseRecord> DispenseRecords => Set<DispenseRecord>();
     public DbSet<DispenseItem> DispenseItems => Set<DispenseItem>();
     public DbSet<StockMovement> StockMovements => Set<StockMovement>();
@@ -171,6 +172,7 @@ public class ApplicationDbContext : DbContext
 
         // PrescriptionItem
         modelBuilder.Entity<PrescriptionItem>()
+            .ToTable("PrescriptionItems")
             .HasOne(pi => pi.Drug)
             .WithMany()
             .HasForeignKey(pi => pi.DrugId)

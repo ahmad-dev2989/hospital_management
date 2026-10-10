@@ -21,29 +21,38 @@ public class ClinicalController : ControllerBase
         _logger = logger;
     }
 
+    private (Guid UserId, string Username) GetCurrentUser()
+    {
+        var idStr = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        var username = User.FindFirstValue(ClaimTypes.Name) ?? User.FindFirstValue("unique_name") ?? "Staff";
+        var userId = Guid.TryParse(idStr, out var parsed) ? parsed : Guid.Empty;
+        return (userId, username);
+    }
+
     [HttpGet("encounters")]
     public async Task<IActionResult> GetEncounters(
-        [FromQuery] Guid? patientId,
-        [FromQuery] Guid? doctorId,
-        [FromQuery] EncounterStatus? status,
         [FromQuery] DateTime? date,
+        [FromQuery] Guid? doctorId,
+        [FromQuery] Guid? patientId,
+        [FromQuery] EncounterStatus? status,
+        [FromQuery] string? query,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50,
         CancellationToken cancellationToken = default)
     {
         var result = await _clinicalService.GetEncountersAsync(
-            patientId, doctorId, status, date, page, pageSize, cancellationToken);
+            date, doctorId, patientId, status, query, page, pageSize, cancellationToken);
         return Ok(result);
     }
 
     [HttpGet("encounters/{id:guid}")]
     public async Task<IActionResult> GetEncounterById(Guid id, CancellationToken cancellationToken)
     {
-        var result = await _clinicalService.GetEncounterByIdAsync(id, cancellationToken);
-        if (result == null)
-            return NotFound(new { message = $"Encounter {id} was not found." });
+        var encounter = await _clinicalService.GetEncounterByIdAsync(id, cancellationToken);
+        if (encounter == null)
+            return NotFound(new { message = $"Encounter {id} not found." });
 
-        return Ok(result);
+        return Ok(encounter);
     }
 
     [HttpPost("encounters")]
@@ -54,10 +63,10 @@ public class ClinicalController : ControllerBase
         if (!ModelState.IsValid)
             return BadRequest(ModelState);
 
+        var (userId, username) = GetCurrentUser();
         try
         {
-            var username = User.FindFirstValue(ClaimTypes.Name) ?? User.FindFirstValue("unique_name") ?? "Staff";
-            var result = await _clinicalService.StartEncounterAsync(request, username, cancellationToken);
+            var result = await _clinicalService.StartEncounterAsync(request, userId, username, cancellationToken);
             return CreatedAtAction(nameof(GetEncounterById), new { id = result.Id }, result);
         }
         catch (KeyNotFoundException ex)
@@ -66,7 +75,57 @@ public class ClinicalController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            return BadRequest(new { message = ex.Message });
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("encounters/{id:guid}/notes")]
+    public async Task<IActionResult> SaveClinicalNote(
+        Guid id,
+        [FromBody] SaveClinicalNoteRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
+        var (userId, username) = GetCurrentUser();
+        try
+        {
+            var result = await _clinicalService.SaveClinicalNoteAsync(id, request, userId, username, cancellationToken);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("encounters/{id:guid}/notes/addendum")]
+    public async Task<IActionResult> AddNoteAddendum(
+        Guid id,
+        [FromBody] AddNoteAddendumRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
+        var (userId, username) = GetCurrentUser();
+        try
+        {
+            var result = await _clinicalService.AddNoteAddendumAsync(id, request, userId, username, cancellationToken);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
         }
     }
 
@@ -79,107 +138,15 @@ public class ClinicalController : ControllerBase
         if (!ModelState.IsValid)
             return BadRequest(ModelState);
 
+        var (userId, username) = GetCurrentUser();
         try
         {
-            var username = User.FindFirstValue(ClaimTypes.Name) ?? User.FindFirstValue("unique_name") ?? "Staff";
-            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
-            var userId = Guid.TryParse(userIdStr, out var parsedId) ? parsedId : Guid.Empty;
-
             var result = await _clinicalService.RecordVitalSignsAsync(id, request, userId, username, cancellationToken);
             return Ok(result);
         }
         catch (KeyNotFoundException ex)
         {
             return NotFound(new { message = ex.Message });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-    }
-
-    [HttpPost("encounters/{id:guid}/notes")]
-    public async Task<IActionResult> SaveNoteDraft(
-        Guid id,
-        [FromBody] SaveClinicalNoteRequest request,
-        CancellationToken cancellationToken)
-    {
-        if (!ModelState.IsValid)
-            return BadRequest(ModelState);
-
-        try
-        {
-            var username = User.FindFirstValue(ClaimTypes.Name) ?? User.FindFirstValue("unique_name") ?? "Staff";
-            var result = await _clinicalService.SaveClinicalNoteDraftAsync(id, request, username, cancellationToken);
-            return Ok(result);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { message = ex.Message });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-    }
-
-    [HttpPost("encounters/{id:guid}/sign")]
-    public async Task<IActionResult> SignEncounter(
-        Guid id,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            var username = User.FindFirstValue(ClaimTypes.Name) ?? User.FindFirstValue("unique_name") ?? "Doctor";
-            
-            // Look up encounter to get doctor ID
-            var enc = await _clinicalService.GetEncounterByIdAsync(id, cancellationToken);
-            if (enc == null)
-                return NotFound(new { message = $"Encounter {id} was not found." });
-
-            var result = await _clinicalService.SignEncounterAsync(id, enc.Doctor.Id, username, cancellationToken);
-            return Ok(result);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { message = ex.Message });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-    }
-
-    [HttpPost("encounters/{id:guid}/addendum")]
-    public async Task<IActionResult> AddAddendum(
-        Guid id,
-        [FromBody] AddAddendumRequest request,
-        CancellationToken cancellationToken)
-    {
-        if (!ModelState.IsValid)
-            return BadRequest(ModelState);
-
-        try
-        {
-            var username = User.FindFirstValue(ClaimTypes.Name) ?? User.FindFirstValue("unique_name") ?? "Doctor";
-            var enc = await _clinicalService.GetEncounterByIdAsync(id, cancellationToken);
-            if (enc == null)
-                return NotFound(new { message = $"Encounter {id} was not found." });
-
-            var result = await _clinicalService.AddNoteAddendumAsync(id, request, enc.Doctor.Id, username, cancellationToken);
-            return Ok(result);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { message = ex.Message });
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
         }
     }
 
@@ -192,10 +159,10 @@ public class ClinicalController : ControllerBase
         if (!ModelState.IsValid)
             return BadRequest(ModelState);
 
+        var (userId, username) = GetCurrentUser();
         try
         {
-            var username = User.FindFirstValue(ClaimTypes.Name) ?? User.FindFirstValue("unique_name") ?? "Staff";
-            var result = await _clinicalService.AddDiagnosisAsync(id, request, username, cancellationToken);
+            var result = await _clinicalService.AddDiagnosisAsync(id, request, userId, username, cancellationToken);
             return Ok(result);
         }
         catch (KeyNotFoundException ex)
@@ -210,12 +177,12 @@ public class ClinicalController : ControllerBase
         Guid diagnosisId,
         CancellationToken cancellationToken)
     {
-        var username = User.FindFirstValue(ClaimTypes.Name) ?? User.FindFirstValue("unique_name") ?? "Staff";
-        var success = await _clinicalService.RemoveDiagnosisAsync(id, diagnosisId, username, cancellationToken);
-        if (!success)
-            return NotFound(new { message = "Diagnosis was not found." });
+        var (userId, username) = GetCurrentUser();
+        var removed = await _clinicalService.RemoveDiagnosisAsync(id, diagnosisId, userId, username, cancellationToken);
+        if (!removed)
+            return NotFound(new { message = $"Diagnosis {diagnosisId} not found." });
 
-        return Ok(new { message = "Diagnosis removed successfully." });
+        return Ok(new { message = "Diagnosis removed." });
     }
 
     [HttpPost("encounters/{id:guid}/prescriptions")]
@@ -227,37 +194,50 @@ public class ClinicalController : ControllerBase
         if (!ModelState.IsValid)
             return BadRequest(ModelState);
 
+        var (userId, username) = GetCurrentUser();
         try
         {
-            var username = User.FindFirstValue(ClaimTypes.Name) ?? User.FindFirstValue("unique_name") ?? "Doctor";
-            var enc = await _clinicalService.GetEncounterByIdAsync(id, cancellationToken);
-            if (enc == null)
-                return NotFound(new { message = $"Encounter {id} was not found." });
-
-            var result = await _clinicalService.CreatePrescriptionAsync(id, request, enc.Doctor.Id, username, cancellationToken);
+            var result = await _clinicalService.CreatePrescriptionAsync(id, request, userId, username, cancellationToken);
             return Ok(result);
         }
         catch (KeyNotFoundException ex)
         {
             return NotFound(new { message = ex.Message });
         }
-        catch (ArgumentException ex)
+    }
+
+    [HttpPost("encounters/{id:guid}/sign")]
+    public async Task<IActionResult> SignAndCloseEncounter(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var (userId, username) = GetCurrentUser();
+        try
         {
-            return BadRequest(new { message = ex.Message });
+            var result = await _clinicalService.SignAndCloseEncounterAsync(id, userId, username, cancellationToken);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
         }
     }
 
-    [HttpGet("icd10")]
-    public async Task<IActionResult> GetIcd10Catalog([FromQuery] string? query, CancellationToken cancellationToken)
+    [HttpGet("icd10-catalog")]
+    public async Task<IActionResult> GetIcd10Catalog([FromQuery] string? search)
     {
-        var list = await _clinicalService.GetIcd10CatalogAsync(query, cancellationToken);
-        return Ok(list);
+        var catalog = await _clinicalService.GetStandardIcd10CatalogAsync(search);
+        return Ok(catalog);
     }
 
     [HttpGet("drugs")]
-    public async Task<IActionResult> GetDrugs([FromQuery] string? query, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetFormularyDrugs(CancellationToken cancellationToken)
     {
-        var list = await _clinicalService.GetEssentialDrugsAsync(query, cancellationToken);
-        return Ok(list);
+        var drugs = await _clinicalService.GetFormularyDrugsAsync(cancellationToken);
+        return Ok(drugs);
     }
 }

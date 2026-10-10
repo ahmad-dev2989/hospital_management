@@ -23,7 +23,6 @@ builder.Services.AddScoped<IPatientNumberGenerator, PatientNumberGenerator>();
 builder.Services.AddScoped<IPatientService, PatientService>();
 builder.Services.AddScoped<IAppointmentNumberGenerator, AppointmentNumberGenerator>();
 builder.Services.AddScoped<IAppointmentService, AppointmentService>();
-builder.Services.AddScoped<IPrescriptionNumberGenerator, PrescriptionNumberGenerator>();
 builder.Services.AddScoped<IClinicalService, ClinicalService>();
 
 // 3. JWT Authentication & Authorization

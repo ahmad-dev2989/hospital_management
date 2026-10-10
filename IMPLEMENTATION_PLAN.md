@@ -21,7 +21,7 @@ This implementation plan tracks the lifecycle, phase progress, and module status
 | **Phase 3** | Authentication & Authorization | **Tested** | Local accounts, BCrypt hashing, JWT session auth, RBAC enforcement, login rate-limiting, 15m lockout, immutable audit logging, and administration UI. |
 | **Phase 4** | Patient Management | **Tested** | Registration, unique patient IDs, duplicate detection, demographic editing, patient chart & timeline. |
 | **Phase 5** | Appointments & Scheduling | **Tested** | Doctor schedules, slot engine, transaction-safe booking, check-in queue, conflict prevention, cancellation. |
-| **Phase 6** | Clinical Management | **Not started** | Encounters, notes (SOAP), vitals, diagnoses, allergies, draft/signing lifecycle, immutable addenda. |
+| **Phase 6** | Clinical Management | **Tested** | Encounters, notes (SOAP), vitals, diagnoses, allergies, draft/signing lifecycle, immutable addenda, e-prescriptions. |
 | **Phase 7** | Laboratory Management | **Not started** | Test catalog, order worklist, specimen barcode tracking, result entry, dual-step verification, critical alerts. |
 | **Phase 8** | Pharmacy & Inventory | **Not started** | Drug catalog, FEFO batch tracking, expiry monitoring, transaction-safe dispensing, stock movements ledger. |
 | **Phase 9** | Billing & Payments | **Not started** | Service catalog, invoice generation, payment capture, idempotent transactions, receipts, refunds, shift close. |
@@ -62,12 +62,12 @@ This implementation plan tracks the lifecycle, phase progress, and module status
 - [x] Rescheduling & cancellation with mandatory audit reason — **Tested**
 
 ### Module D: Clinical Management
-- [x] Encounter, ClinicalNote, VitalSign, Diagnosis schema — **Implemented**
-- [ ] Encounter lifecycle (Open -> InProgress -> Draft -> Signed -> Closed) — **Not started**
-- [ ] Immutable clinical note signing and addendum versioning — **Not started**
-- [ ] Vital signs recording with abnormal threshold highlighting — **Not started**
-- [ ] ICD-10 diagnosis recording and condition history tracking — **Not started**
-- [ ] Patient allergy recording with clinical alert banner — **Not started**
+- [x] Encounter, ClinicalNote, VitalSign, Diagnosis schema — **Tested**
+- [x] Encounter lifecycle (Open -> InProgress -> Draft -> Signed -> Closed) — **Tested**
+- [x] Immutable clinical note signing and addendum versioning — **Tested**
+- [x] Vital signs recording with abnormal threshold highlighting — **Tested**
+- [x] ICD-10 diagnosis recording and condition history tracking — **Tested**
+- [x] Patient allergy recording with clinical alert banner & cross-allergy e-prescribing — **Tested**
 
 ### Module E: Laboratory Management
 - [x] LabTest, LabOrder, LabOrderItem schema — **Implemented**

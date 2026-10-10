@@ -554,6 +554,97 @@ class ApiClient {
     const qs = params.toString();
     return this.request<AppointmentQueueSummaryDto>(`/appointments/queue-summary${qs ? `?${qs}` : ''}`);
   }
+
+  // Clinical Encounters & Notes methods
+  async getEncounters(params?: {
+    date?: string;
+    doctorId?: string;
+    patientId?: string;
+    status?: EncounterStatus;
+    query?: string;
+    page?: number;
+    pageSize?: number;
+  }): Promise<PagedResult<EncounterDto>> {
+    const searchParams = new URLSearchParams();
+    if (params?.date) searchParams.append('date', params.date);
+    if (params?.doctorId) searchParams.append('doctorId', params.doctorId);
+    if (params?.patientId) searchParams.append('patientId', params.patientId);
+    if (params?.status !== undefined) searchParams.append('status', params.status.toString());
+    if (params?.query) searchParams.append('query', params.query);
+    if (params?.page) searchParams.append('page', params.page.toString());
+    if (params?.pageSize) searchParams.append('pageSize', params.pageSize.toString());
+    const qs = searchParams.toString();
+    return this.request<PagedResult<EncounterDto>>(`/clinical/encounters${qs ? `?${qs}` : ''}`);
+  }
+
+  async getEncounterById(id: string): Promise<EncounterDto> {
+    return this.request<EncounterDto>(`/clinical/encounters/${id}`);
+  }
+
+  async startEncounter(data: StartEncounterRequest): Promise<EncounterDto> {
+    return this.request<EncounterDto>('/clinical/encounters', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async saveClinicalNote(encounterId: string, data: SaveClinicalNoteRequest): Promise<ClinicalNoteDto> {
+    return this.request<ClinicalNoteDto>(`/clinical/encounters/${encounterId}/notes`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async addNoteAddendum(encounterId: string, data: AddNoteAddendumRequest): Promise<ClinicalNoteDto> {
+    return this.request<ClinicalNoteDto>(`/clinical/encounters/${encounterId}/notes/addendum`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async recordVitalSigns(encounterId: string, data: RecordVitalSignsRequest): Promise<VitalSignDto> {
+    return this.request<VitalSignDto>(`/clinical/encounters/${encounterId}/vitals`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async addDiagnosis(encounterId: string, data: AddDiagnosisRequest): Promise<DiagnosisDto> {
+    return this.request<DiagnosisDto>(`/clinical/encounters/${encounterId}/diagnoses`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async removeDiagnosis(encounterId: string, diagnosisId: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/clinical/encounters/${encounterId}/diagnoses/${diagnosisId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async createPrescription(encounterId: string, data: CreatePrescriptionRequest): Promise<PrescriptionDto> {
+    return this.request<PrescriptionDto>(`/clinical/encounters/${encounterId}/prescriptions`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async signAndCloseEncounter(encounterId: string): Promise<EncounterDto> {
+    return this.request<EncounterDto>(`/clinical/encounters/${encounterId}/sign`, {
+      method: 'POST',
+    });
+  }
+
+  async getIcd10Catalog(search?: string): Promise<Icd10CatalogItemDto[]> {
+    const params = new URLSearchParams();
+    if (search) params.append('search', search);
+    const qs = params.toString();
+    return this.request<Icd10CatalogItemDto[]>(`/clinical/icd10-catalog${qs ? `?${qs}` : ''}`);
+  }
+
+  async getFormularyDrugs(): Promise<DrugDto[]> {
+    return this.request<DrugDto[]>('/clinical/drugs');
+  }
 }
 
 // Module C (Appointments & Scheduling) Interfaces
@@ -674,6 +765,207 @@ export interface DepartmentDto {
   code: string;
   name: string;
   description?: string;
+  isActive: boolean;
+}
+
+// Module D (Clinical Management) Interfaces
+export type EncounterStatus =
+  | 0 // Open
+  | 1 // InProgress
+  | 2 // Draft
+  | 3 // Signed
+  | 4 // Closed
+  | 5; // AmendedByAddendum
+
+export const ENCOUNTER_STATUS_NAMES: Record<EncounterStatus, string> = {
+  0: 'Open',
+  1: 'In Progress',
+  2: 'Draft',
+  3: 'Signed & Sealed',
+  4: 'Closed',
+  5: 'Amended by Addendum',
+};
+
+export interface ClinicalNoteDto {
+  id: string;
+  encounterId: string;
+  chiefComplaint: string;
+  historyOfPresentIllness?: string | null;
+  examinationFindings?: string | null;
+  assessment?: string | null;
+  treatmentPlan?: string | null;
+  version: number;
+  isFinalized: boolean;
+  supersedesNoteId?: string | null;
+  amendmentReason?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SaveClinicalNoteRequest {
+  chiefComplaint: string;
+  historyOfPresentIllness?: string;
+  examinationFindings?: string;
+  assessment?: string;
+  treatmentPlan?: string;
+}
+
+export interface AddNoteAddendumRequest {
+  supersedesNoteId: string;
+  amendmentReason: string;
+  chiefComplaint: string;
+  historyOfPresentIllness?: string;
+  examinationFindings?: string;
+  assessment?: string;
+  treatmentPlan?: string;
+}
+
+export interface VitalSignDto {
+  id: string;
+  encounterId: string;
+  patientId: string;
+  recordedByUserId: string;
+  recordedByUserName: string;
+  systolicBp?: number | null;
+  diastolicBp?: number | null;
+  heartRateBpm?: number | null;
+  respiratoryRateBpm?: number | null;
+  temperatureCelsius?: number | null;
+  oxygenSaturationPct?: number | null;
+  weightKg?: number | null;
+  heightCm?: number | null;
+  bpCategory?: string | null;
+  bmi?: number | null;
+  bmiCategory?: string | null;
+  isAbnormal: boolean;
+  abnormalAlerts: string[];
+  recordedAt: string;
+  createdAt: string;
+}
+
+export interface RecordVitalSignsRequest {
+  systolicBp?: number;
+  diastolicBp?: number;
+  heartRateBpm?: number;
+  respiratoryRateBpm?: number;
+  temperatureCelsius?: number;
+  oxygenSaturationPct?: number;
+  weightKg?: number;
+  heightCm?: number;
+}
+
+export interface DiagnosisDto {
+  id: string;
+  encounterId: string;
+  patientId: string;
+  icd10Code?: string | null;
+  description: string;
+  isPrimary: boolean;
+  recordedAt: string;
+}
+
+export interface AddDiagnosisRequest {
+  icd10Code?: string;
+  description: string;
+  isPrimary: boolean;
+}
+
+export interface PrescriptionItemDto {
+  id: string;
+  prescriptionId: string;
+  drugId: string;
+  drugName: string;
+  drugCode: string;
+  dosage: string;
+  frequency: string;
+  route: string;
+  durationDays: number;
+  quantityPrescribed: number;
+  quantityDispensed: number;
+  instructions?: string | null;
+}
+
+export interface PrescriptionDto {
+  id: string;
+  prescriptionNumber: string;
+  encounterId: string;
+  patientId: string;
+  patientName: string;
+  doctorId: string;
+  doctorName: string;
+  signedAt: string;
+  status: number;
+  statusName: string;
+  items: PrescriptionItemDto[];
+  createdAt: string;
+}
+
+export interface CreatePrescriptionItemRequest {
+  drugId: string;
+  dosage: string;
+  frequency: string;
+  route: string;
+  durationDays: number;
+  quantityPrescribed: number;
+  instructions?: string;
+}
+
+export interface CreatePrescriptionRequest {
+  items: CreatePrescriptionItemRequest[];
+}
+
+export interface EncounterDto {
+  id: string;
+  patientId: string;
+  patientNumber: string;
+  patientName: string;
+  patientAge: number;
+  patientGender: string;
+  patientBloodGroup?: string | null;
+  patientHasHighRiskAllergy: boolean;
+  patientAllergies: string[];
+  appointmentId?: string | null;
+  appointmentNumber?: string | null;
+  doctorId: string;
+  doctorName: string;
+  specialization: string;
+  departmentName: string;
+  startedAt: string;
+  endedAt?: string | null;
+  status: EncounterStatus;
+  statusName: string;
+  signedAt?: string | null;
+  signedByDoctorId?: string | null;
+  signedByDoctorName?: string | null;
+  notes: ClinicalNoteDto[];
+  vitalSigns: VitalSignDto[];
+  diagnoses: DiagnosisDto[];
+  prescriptions: PrescriptionDto[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StartEncounterRequest {
+  patientId: string;
+  doctorId: string;
+  appointmentId?: string;
+  chiefComplaint?: string;
+}
+
+export interface Icd10CatalogItemDto {
+  code: string;
+  description: string;
+  category: string;
+}
+
+export interface DrugDto {
+  id: string;
+  code: string;
+  brandName: string;
+  genericName: string;
+  dosageForm: string;
+  strength: string;
+  reorderLevel: number;
   isActive: boolean;
 }
 
