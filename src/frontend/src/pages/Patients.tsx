@@ -54,6 +54,76 @@ const formatDocBytes = (bytes: number): string => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 };
 
+interface SlotShiftGroup {
+  label: string;
+  slots: TimeSlotDto[];
+}
+
+const formatSlotTime12 = (dateStr: string) => {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  let hours = d.getHours();
+  const minutes = d.getMinutes();
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  const minStr = minutes < 10 ? '0' + minutes : minutes;
+  return `${hours}:${minStr} ${ampm}`;
+};
+
+const groupTimeSlotsByShift = (slots: TimeSlotDto[]): SlotShiftGroup[] => {
+  if (!slots || slots.length === 0) return [];
+
+  const groups: SlotShiftGroup[] = [];
+  let currentGroup: { label: string; start: string; end: string; slots: TimeSlotDto[] } | null = null;
+  let prevEndMs: number | null = null;
+
+  for (const slot of slots) {
+    const startMs = new Date(slot.startsAt).getTime();
+    const endMs = new Date(slot.endsAt).getTime();
+
+    const isNewWindow =
+      !currentGroup ||
+      (slot.shiftWindow && slot.shiftWindow !== currentGroup.label) ||
+      (!slot.shiftWindow && prevEndMs !== null && Math.abs(startMs - prevEndMs) > 60000);
+
+    if (isNewWindow) {
+      if (currentGroup) {
+        const finalLabel = currentGroup.label && currentGroup.label.length > 0
+          ? `Slots from ${currentGroup.label}`
+          : `Slots from ${formatSlotTime12(currentGroup.start)} – ${formatSlotTime12(currentGroup.end)}`;
+        groups.push({
+          label: finalLabel,
+          slots: currentGroup.slots,
+        });
+      }
+      currentGroup = {
+        label: slot.shiftWindow || '',
+        start: slot.startsAt,
+        end: slot.endsAt,
+        slots: [slot],
+      };
+    } else {
+      currentGroup!.end = slot.endsAt;
+      currentGroup!.slots.push(slot);
+    }
+    prevEndMs = endMs;
+  }
+
+  if (currentGroup) {
+    const finalLabel = currentGroup.label && currentGroup.label.length > 0
+      ? `Slots from ${currentGroup.label}`
+      : `Slots from ${formatSlotTime12(currentGroup.start)} – ${formatSlotTime12(currentGroup.end)}`;
+    groups.push({
+      label: finalLabel,
+      slots: currentGroup.slots,
+    });
+  }
+
+  return groups;
+};
+
 export const Patients: React.FC = () => {
   const {
     activePatient,
@@ -787,7 +857,7 @@ export const Patients: React.FC = () => {
       {/* REGISTER PATIENT MODAL */}
       {showRegisterModal && (
         <div className="modal-backdrop">
-          <div className="modal-content card" style={{ maxWidth: '640px' }}>
+          <div className="modal-content card" style={{ maxWidth: '680px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div className="modal-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                 <UserPlus size={20} color="#0d9488" />
@@ -797,7 +867,7 @@ export const Patients: React.FC = () => {
             </div>
 
             {modalError && (
-              <div className="login-alert alert-warning" style={{ margin: '1rem 0' }}>
+              <div className="login-alert alert-warning" style={{ margin: '0.75rem 0' }}>
                 <AlertCircle size={18} />
                 <span>{modalError}</span>
               </div>
@@ -805,7 +875,7 @@ export const Patients: React.FC = () => {
 
             {/* DUPLICATE WARNING MODAL OVERLAY */}
             {showDuplicateWarning && (
-              <div style={{ backgroundColor: '#fff7ed', border: '1px solid #fdba74', borderRadius: '8px', padding: '1rem', margin: '1rem 0' }}>
+              <div style={{ backgroundColor: '#fff7ed', border: '1px solid #fdba74', borderRadius: '8px', padding: '0.85rem', margin: '0.75rem 0' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#c2410c', fontWeight: 700 }}>
                   <AlertTriangle size={20} />
                   <span>Potential Duplicate Patients Detected</span>
@@ -825,7 +895,7 @@ export const Patients: React.FC = () => {
                   ))}
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.75rem' }}>
                   <button
                     type="button"
                     className="btn btn-outline btn-sm"
@@ -845,10 +915,10 @@ export const Patients: React.FC = () => {
               </div>
             )}
 
-            <form onSubmit={(e) => handleRegisterSubmit(e, false)} style={{ marginTop: '1rem' }}>
+            <form onSubmit={(e) => handleRegisterSubmit(e, false)} style={{ marginTop: '0.75rem' }}>
               <div className="form-row-2">
-                <div className="form-group">
-                  <label className="form-label">First Name *</label>
+                <div className="form-group" style={{ marginBottom: '0.6rem' }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem', marginBottom: '0.2rem' }}>First Name *</label>
                   <input
                     type="text"
                     className="form-input"
@@ -858,8 +928,8 @@ export const Patients: React.FC = () => {
                     required
                   />
                 </div>
-                <div className="form-group">
-                  <label className="form-label">Last Name *</label>
+                <div className="form-group" style={{ marginBottom: '0.6rem' }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem', marginBottom: '0.2rem' }}>Last Name *</label>
                   <input
                     type="text"
                     className="form-input"
@@ -871,9 +941,10 @@ export const Patients: React.FC = () => {
                 </div>
               </div>
 
-              <div className="form-row-2">
-                <div className="form-group">
-                  <label className="form-label">Date of Birth *</label>
+              {/* 3-Column Demographic Row */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '0.65rem', marginBottom: '0.6rem' }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem', marginBottom: '0.2rem' }}>Date of Birth *</label>
                   <input
                     type="date"
                     className="form-input"
@@ -882,8 +953,8 @@ export const Patients: React.FC = () => {
                     required
                   />
                 </div>
-                <div className="form-group">
-                  <label className="form-label">Gender *</label>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem', marginBottom: '0.2rem' }}>Gender *</label>
                   <select
                     className="form-input"
                     value={registerForm.gender}
@@ -894,11 +965,25 @@ export const Patients: React.FC = () => {
                     ))}
                   </select>
                 </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem', marginBottom: '0.2rem' }}>Blood Group</label>
+                  <select
+                    className="form-input"
+                    value={registerForm.bloodGroup || ''}
+                    onChange={(e) => setRegisterForm({ ...registerForm, bloodGroup: e.target.value || null })}
+                  >
+                    <option value="">Unknown</option>
+                    {BLOOD_GROUPS.map((bg) => (
+                      <option key={bg} value={bg}>{bg}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
+              {/* Contact Information (Phone & Email) */}
               <div className="form-row-2">
-                <div className="form-group">
-                  <label className="form-label">Primary Contact Phone *</label>
+                <div className="form-group" style={{ marginBottom: '0.6rem' }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem', marginBottom: '0.2rem' }}>Primary Phone *</label>
                   <input
                     type="tel"
                     className="form-input"
@@ -908,34 +993,20 @@ export const Patients: React.FC = () => {
                     required
                   />
                 </div>
-                <div className="form-group">
-                  <label className="form-label">Blood Group</label>
-                  <select
+                <div className="form-group" style={{ marginBottom: '0.6rem' }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem', marginBottom: '0.2rem' }}>Email Address (Optional)</label>
+                  <input
+                    type="email"
                     className="form-input"
-                    value={registerForm.bloodGroup || ''}
-                    onChange={(e) => setRegisterForm({ ...registerForm, bloodGroup: e.target.value || null })}
-                  >
-                    <option value="">Unknown / Not Tested</option>
-                    {BLOOD_GROUPS.map((bg) => (
-                      <option key={bg} value={bg}>{bg}</option>
-                    ))}
-                  </select>
+                    placeholder="e.g. patient@example.local"
+                    value={registerForm.email || ''}
+                    onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
+                  />
                 </div>
               </div>
 
-              <div className="form-group">
-                <label className="form-label">Email Address (Optional)</label>
-                <input
-                  type="email"
-                  className="form-input"
-                  placeholder="e.g. patient@example.local"
-                  value={registerForm.email || ''}
-                  onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Residential Address</label>
+              <div className="form-group" style={{ marginBottom: '0.6rem' }}>
+                <label className="form-label" style={{ fontSize: '0.8rem', marginBottom: '0.2rem' }}>Residential Address</label>
                 <input
                   type="text"
                   className="form-input"
@@ -946,8 +1017,8 @@ export const Patients: React.FC = () => {
               </div>
 
               <div className="form-row-2">
-                <div className="form-group">
-                  <label className="form-label">Emergency Contact Name</label>
+                <div className="form-group" style={{ marginBottom: '0.6rem' }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem', marginBottom: '0.2rem' }}>Emergency Contact Name</label>
                   <input
                     type="text"
                     className="form-input"
@@ -956,8 +1027,8 @@ export const Patients: React.FC = () => {
                     onChange={(e) => setRegisterForm({ ...registerForm, emergencyContactName: e.target.value })}
                   />
                 </div>
-                <div className="form-group">
-                  <label className="form-label">Emergency Contact Phone</label>
+                <div className="form-group" style={{ marginBottom: '0.6rem' }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem', marginBottom: '0.2rem' }}>Emergency Contact Phone</label>
                   <input
                     type="tel"
                     className="form-input"
@@ -968,135 +1039,167 @@ export const Patients: React.FC = () => {
                 </div>
               </div>
 
-              {/* Initial Appointment Booking (Date & 15-Minute Time Slot) */}
-              <div style={{ marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px solid #e2e8f0' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <Calendar size={18} color="#0d9488" />
-                    <span style={{ fontWeight: 600, fontSize: '0.925rem', color: '#0f172a' }}>Initial Appointment (Date & Time Slot)</span>
-                  </div>
-                  {regSelectedSlot ? (
-                    <span style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 600, backgroundColor: '#f0fdf4', padding: '0.2rem 0.5rem', borderRadius: '4px', border: '1px solid #bbf7d0' }}>
-                      Selected: {regSelectedSlot.timeDisplay}
-                    </span>
-                  ) : (
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                      Optional: select a slot to auto-schedule
-                    </span>
-                  )}
-                </div>
-
-                <div className="form-row-2">
-                  <div className="form-group">
-                    <label className="form-label">Appointment Target Date</label>
-                    <input
-                      type="date"
-                      className="form-input"
-                      value={regDate}
-                      onChange={(e) => setRegDate(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">Attending Doctor</label>
-                    {singleCandidateDoctor ? (
-                      <div style={{ padding: '0.5rem 0.75rem', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px' }}>
-                        <div style={{ fontWeight: 600, color: '#15803d', fontSize: '0.85rem' }}>
-                          {singleCandidateDoctor.fullName}
+              {/* Initial Appointment Booking (Date & Time Slots Grouped by Shift) */}
+              <div style={{ marginTop: '0.85rem', paddingTop: '0.85rem', borderTop: '1px solid #e2e8f0' }}>
+                {(() => {
+                  const grouped = groupTimeSlotsByShift(regSlots);
+                  const selectedGroup = grouped.find((g) =>
+                    g.slots.some((s) => s.startsAt === regSelectedSlot?.startsAt)
+                  );
+                  return (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.45rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                          <Calendar size={17} color="#0d9488" />
+                          <span style={{ fontWeight: 600, fontSize: '0.875rem', color: '#0f172a' }}>
+                            Initial Appointment (Date & Time Slot)
+                          </span>
                         </div>
-                        <div style={{ fontSize: '0.725rem', color: '#16a34a' }}>
-                          {singleCandidateDoctor.specialization}
+                        {regSelectedSlot ? (
+                          <span style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 600, backgroundColor: '#f0fdf4', padding: '0.2rem 0.5rem', borderRadius: '4px', border: '1px solid #bbf7d0' }}>
+                            Selected: {formatSlotTime12(regSelectedSlot.startsAt)} ({selectedGroup?.label || 'Shift'})
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: '0.725rem', color: '#64748b' }}>
+                            Optional: select a slot to auto-schedule
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="form-row-2">
+                        <div className="form-group" style={{ marginBottom: '0.45rem' }}>
+                          <label className="form-label" style={{ fontSize: '0.775rem', marginBottom: '0.2rem' }}>Appointment Target Date</label>
+                          <input
+                            type="date"
+                            className="form-input"
+                            value={regDate}
+                            onChange={(e) => setRegDate(e.target.value)}
+                          />
+                        </div>
+
+                        <div className="form-group" style={{ marginBottom: '0.45rem' }}>
+                          <label className="form-label" style={{ fontSize: '0.775rem', marginBottom: '0.2rem' }}>Attending Doctor</label>
+                          {singleCandidateDoctor ? (
+                            <div style={{ padding: '0.4rem 0.6rem', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px' }}>
+                              <div style={{ fontWeight: 600, color: '#15803d', fontSize: '0.8rem' }}>
+                                {singleCandidateDoctor.fullName}
+                              </div>
+                              <div style={{ fontSize: '0.7rem', color: '#16a34a' }}>
+                                {singleCandidateDoctor.specialization}
+                              </div>
+                            </div>
+                          ) : (
+                            <select
+                              className="form-input"
+                              value={regDoctorId}
+                              onChange={(e) => setRegDoctorId(e.target.value)}
+                            >
+                              {doctors.map((d) => (
+                                <option key={d.id} value={d.id}>
+                                  {d.fullName} ({d.specialization})
+                                </option>
+                              ))}
+                            </select>
+                          )}
                         </div>
                       </div>
-                    ) : (
-                      <select
-                        className="form-input"
-                        value={regDoctorId}
-                        onChange={(e) => setRegDoctorId(e.target.value)}
-                      >
-                        {doctors.map((d) => (
-                          <option key={d.id} value={d.id}>
-                            {d.fullName} ({d.specialization})
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
-                </div>
 
-                {/* Visual 15-Minute Slot Picker */}
-                <div style={{ marginTop: '0.5rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#334155' }}>
-                      Available 15-Minute Time Slots
-                    </span>
-                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                      {regSlots.filter((s) => s.isAvailable).length} slots open
-                    </span>
-                  </div>
+                      {/* Visual 15-Minute Slot Picker Grouped by Shift Window */}
+                      <div style={{ marginTop: '0.35rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                          <span style={{ fontSize: '0.775rem', fontWeight: 600, color: '#334155' }}>
+                            Available Time Slots
+                          </span>
+                          <span style={{ fontSize: '0.725rem', color: '#64748b' }}>
+                            {regSlots.filter((s) => s.isAvailable).length} slots open
+                          </span>
+                        </div>
 
-                  {regSlotsLoading ? (
-                    <div style={{ textAlign: 'center', padding: '1rem', color: '#64748b', fontSize: '0.8rem' }}>
-                      <RefreshCw size={16} className="spin" style={{ margin: '0 auto 0.25rem auto' }} />
-                      Loading 15-minute slots...
-                    </div>
-                  ) : regSlots.length === 0 ? (
-                    <div style={{ padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '6px', textAlign: 'center', color: '#64748b', fontSize: '0.8rem', border: '1px dashed #cbd5e1' }}>
-                      No open slots for this physician on {regDate}. You can configure shifts in the Appointments tab.
-                    </div>
-                  ) : (
-                    <div
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(4, 1fr)',
-                        gap: '0.4rem',
-                        maxHeight: '140px',
-                        overflowY: 'auto',
-                        padding: '0.35rem',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '6px',
-                        backgroundColor: '#fafafa',
-                      }}
-                    >
-                      {regSlots.map((s, idx) => {
-                        const isSelected = regSelectedSlot?.startsAt === s.startsAt;
-                        return (
-                          <button
-                            key={idx}
-                            type="button"
-                            disabled={!s.isAvailable}
-                            onClick={() => setRegSelectedSlot(isSelected ? null : s)}
+                        {regSlotsLoading ? (
+                          <div style={{ textAlign: 'center', padding: '0.75rem', color: '#64748b', fontSize: '0.8rem' }}>
+                            <RefreshCw size={16} className="spin" style={{ margin: '0 auto 0.25rem auto' }} />
+                            Loading available slots...
+                          </div>
+                        ) : regSlots.length === 0 ? (
+                          <div style={{ padding: '0.65rem', backgroundColor: '#f8fafc', borderRadius: '6px', textAlign: 'center', color: '#64748b', fontSize: '0.8rem', border: '1px dashed #cbd5e1' }}>
+                            No open slots for this physician on {regDate}. You can configure shifts in the Appointments tab.
+                          </div>
+                        ) : (
+                          <div
                             style={{
-                              padding: '0.35rem 0.2rem',
-                              fontSize: '0.75rem',
-                              fontWeight: 600,
-                              borderRadius: '4px',
-                              border: isSelected
-                                ? '2px solid #0d9488'
-                                : s.isAvailable
-                                ? '1px solid #bbf7d0'
-                                : '1px solid #e2e8f0',
-                              backgroundColor: isSelected
-                                ? '#0d9488'
-                                : s.isAvailable
-                                ? '#f0fdf4'
-                                : '#f1f5f9',
-                              color: isSelected ? '#fff' : s.isAvailable ? '#166534' : '#94a3b8',
-                              cursor: s.isAvailable ? 'pointer' : 'not-allowed',
-                              transition: 'all 0.15s ease',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.5rem',
+                              maxHeight: '190px',
+                              overflowY: 'auto',
+                              padding: '0.45rem',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '6px',
+                              backgroundColor: '#fafafa',
                             }}
-                            title={s.isAvailable ? 'Click to select slot' : 'Occupied'}
                           >
-                            {s.timeDisplay}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                            {grouped.map((group, gIdx) => (
+                              <div key={gIdx} style={{ backgroundColor: '#ffffff', borderRadius: '6px', padding: '0.45rem 0.6rem', border: '1px solid #e2e8f0' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                                  <strong style={{ fontSize: '0.775rem', color: '#0f766e' }}>
+                                    {group.label}:
+                                  </strong>
+                                  <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                                    {group.slots.filter((s) => s.isAvailable).length} open
+                                  </span>
+                                </div>
+                                <div
+                                  style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(auto-fill, minmax(76px, 1fr))',
+                                    gap: '0.3rem',
+                                  }}
+                                >
+                                  {group.slots.map((s, idx) => {
+                                    const isSelected = regSelectedSlot?.startsAt === s.startsAt;
+                                    return (
+                                      <button
+                                        key={idx}
+                                        type="button"
+                                        disabled={!s.isAvailable}
+                                        onClick={() => setRegSelectedSlot(isSelected ? null : s)}
+                                        style={{
+                                          padding: '0.3rem 0.2rem',
+                                          fontSize: '0.75rem',
+                                          fontWeight: 600,
+                                          borderRadius: '4px',
+                                          border: isSelected
+                                            ? '2px solid #0d9488'
+                                            : s.isAvailable
+                                            ? '1px solid #bbf7d0'
+                                            : '1px solid #e2e8f0',
+                                          backgroundColor: isSelected
+                                            ? '#0d9488'
+                                            : s.isAvailable
+                                            ? '#f0fdf4'
+                                            : '#f1f5f9',
+                                          color: isSelected ? '#ffffff' : s.isAvailable ? '#15803d' : '#94a3b8',
+                                          cursor: s.isAvailable ? 'pointer' : 'not-allowed',
+                                          transition: 'all 0.15s ease',
+                                        }}
+                                        title={s.isAvailable ? `${s.timeDisplay} (Available)` : 'Occupied'}
+                                      >
+                                        {formatSlotTime12(s.startsAt)}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
 
-              <div className="modal-actions">
+              <div className="modal-actions" style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid #e2e8f0' }}>
                 <button
                   type="button"
                   className="btn btn-outline"

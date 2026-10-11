@@ -83,6 +83,7 @@ public class TimeSlotDto
     public string? AppointmentNumber { get; set; }
     public string? PatientName { get; set; }
     public AppointmentStatus? Status { get; set; }
+    public string? ShiftWindow { get; set; }
 }
 
 public class AppointmentDto

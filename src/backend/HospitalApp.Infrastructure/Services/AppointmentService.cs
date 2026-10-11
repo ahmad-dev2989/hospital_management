@@ -539,6 +539,7 @@ public class AppointmentService : IAppointmentService
             var dayEnd = dateUtc.Add(schedule.EndTime);
             var slotMinutes = schedule.SlotDurationMinutes > 0 ? schedule.SlotDurationMinutes : 15;
             var duration = TimeSpan.FromMinutes(slotMinutes);
+            var shiftWindow = $"{DateTime.Today.Add(schedule.StartTime):h:mm tt} – {DateTime.Today.Add(schedule.EndTime):h:mm tt}";
 
             var current = dayStart;
             while (current + duration <= dayEnd)
@@ -555,7 +556,8 @@ public class AppointmentService : IAppointmentService
                     AppointmentId = appt?.Id,
                     AppointmentNumber = appt?.AppointmentNumber,
                     PatientName = appt == null ? null : $"{appt.Patient.FirstName} {appt.Patient.LastName}",
-                    Status = appt?.Status
+                    Status = appt?.Status,
+                    ShiftWindow = shiftWindow
                 });
 
                 current += duration;

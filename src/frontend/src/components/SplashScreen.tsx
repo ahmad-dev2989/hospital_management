@@ -34,7 +34,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: '#090d16',
+        backgroundColor: '#f8fafc',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -49,9 +49,9 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
           width: '84px',
           height: '84px',
           borderRadius: '24px',
-          background: 'linear-gradient(135deg, rgba(13,148,136,0.2) 0%, rgba(15,23,42,0.8) 100%)',
-          border: '1px solid rgba(13,148,136,0.4)',
-          boxShadow: '0 0 35px rgba(13,148,136,0.35)',
+          background: 'linear-gradient(135deg, #ffffff 0%, #f0fdfa 100%)',
+          border: '1px solid #99f6e4',
+          boxShadow: '0 10px 30px -5px rgba(13,148,136,0.25), 0 0 0 1px rgba(13,148,136,0.1)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -59,7 +59,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
           animation: 'pulse 2s infinite ease-in-out',
         }}
       >
-        <Activity size={44} color="#14b8a6" strokeWidth={2.4} />
+        <Activity size={44} color="#0d9488" strokeWidth={2.4} />
       </div>
 
       {/* Typing Animation Text */}
@@ -74,9 +74,9 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
           style={{
             fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
             fontSize: '1.15rem',
-            fontWeight: 500,
-            letterSpacing: '0.04em',
-            color: '#cbd5e1',
+            fontWeight: 600,
+            letterSpacing: '0.03em',
+            color: '#0f172a',
           }}
         >
           {displayedText}
@@ -87,7 +87,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
             display: 'inline-block',
             width: '2px',
             height: '1.2rem',
-            backgroundColor: '#14b8a6',
+            backgroundColor: '#0d9488',
             marginLeft: '4px',
             animation: 'blink 0.8s infinite',
             opacity: isTypingComplete ? 0 : 1,
@@ -102,8 +102,8 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
           50% { opacity: 0; }
         }
         @keyframes pulse {
-          0%, 100% { transform: scale(1); box-shadow: 0 0 25px rgba(13,148,136,0.25); }
-          50% { transform: scale(1.04); box-shadow: 0 0 40px rgba(13,148,136,0.45); }
+          0%, 100% { transform: scale(1); box-shadow: 0 10px 25px -5px rgba(13,148,136,0.2); }
+          50% { transform: scale(1.05); box-shadow: 0 15px 35px -5px rgba(13,148,136,0.35); }
         }
       `}</style>
     </div>

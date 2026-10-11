@@ -1276,6 +1276,7 @@ export interface TimeSlotDto {
   appointmentNumber?: string | null;
   patientName?: string | null;
   status?: AppointmentStatus | null;
+  shiftWindow?: string | null;
 }
 
 export interface AppointmentDto {

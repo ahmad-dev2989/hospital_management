@@ -499,6 +499,8 @@ textarea.input-field:focus,
 .modal-card {
   width: 100%;
   max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
   background-color: var(--bg-surface, #ffffff);
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.08);
   border-radius: 12px;

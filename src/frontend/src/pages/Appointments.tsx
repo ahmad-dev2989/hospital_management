@@ -119,6 +119,71 @@ export const Appointments: React.FC = () => {
     return `${displayH}:${displayM} ${period}`;
   };
 
+  const formatSlotTime12 = (dateStr: string) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    let hours = d.getHours();
+    const minutes = d.getMinutes();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    const minStr = minutes < 10 ? '0' + minutes : minutes;
+    return `${hours}:${minStr} ${ampm}`;
+  };
+
+  const groupTimeSlotsByShift = (slots: TimeSlotDto[]) => {
+    if (!slots || slots.length === 0) return [];
+
+    const groups: Array<{ label: string; slots: TimeSlotDto[] }> = [];
+    let currentGroup: { label: string; start: string; end: string; slots: TimeSlotDto[] } | null = null;
+    let prevEndMs: number | null = null;
+
+    for (const slot of slots) {
+      const startMs = new Date(slot.startsAt).getTime();
+      const endMs = new Date(slot.endsAt).getTime();
+
+      const isNewWindow =
+        !currentGroup ||
+        (slot.shiftWindow && slot.shiftWindow !== currentGroup.label) ||
+        (!slot.shiftWindow && prevEndMs !== null && Math.abs(startMs - prevEndMs) > 60000);
+
+      if (isNewWindow) {
+        if (currentGroup) {
+          const finalLabel = currentGroup.label && currentGroup.label.length > 0
+            ? `Slots from ${currentGroup.label}`
+            : `Slots from ${formatSlotTime12(currentGroup.start)} – ${formatSlotTime12(currentGroup.end)}`;
+          groups.push({
+            label: finalLabel,
+            slots: currentGroup.slots,
+          });
+        }
+        currentGroup = {
+          label: slot.shiftWindow || '',
+          start: slot.startsAt,
+          end: slot.endsAt,
+          slots: [slot],
+        };
+      } else {
+        currentGroup!.end = slot.endsAt;
+        currentGroup!.slots.push(slot);
+      }
+      prevEndMs = endMs;
+    }
+
+    if (currentGroup) {
+      const finalLabel = currentGroup.label && currentGroup.label.length > 0
+        ? `Slots from ${currentGroup.label}`
+        : `Slots from ${formatSlotTime12(currentGroup.start)} – ${formatSlotTime12(currentGroup.end)}`;
+      groups.push({
+        label: finalLabel,
+        slots: currentGroup.slots,
+      });
+    }
+
+    return groups;
+  };
+
   const selectDoctorForSchedule = (docId: string, currentDocs: DoctorDto[] = doctors) => {
     setScheduleDoctorId(docId);
     setSelectedEditDay(null);
@@ -1139,11 +1204,17 @@ export const Appointments: React.FC = () => {
               <div style={{ marginBottom: '1rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
                   <label className="form-label" style={{ margin: 0 }}>
-                    Select Available 15-Minute Slot *
+                    Select Available Time Slot *
                   </label>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    {availableSlots.filter((s) => s.isAvailable).length} slots open
-                  </span>
+                  {selectedSlot ? (
+                    <span style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 600, backgroundColor: '#f0fdf4', padding: '0.2rem 0.5rem', borderRadius: '4px', border: '1px solid #bbf7d0' }}>
+                      Selected: {formatSlotTime12(selectedSlot.startsAt)} ({groupTimeSlotsByShift(availableSlots).find(g => g.slots.some(s => s.startsAt === selectedSlot.startsAt))?.label || 'Shift'})
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      {availableSlots.filter((s) => s.isAvailable).length} slots open
+                    </span>
+                  )}
                 </div>
 
                 {slotsLoading ? (
@@ -1170,56 +1241,82 @@ export const Appointments: React.FC = () => {
                     </button>
                   </div>
                 ) : (
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(4, 1fr)',
-                      gap: '0.45rem',
-                      maxHeight: '180px',
-                      overflowY: 'auto',
-                      padding: '0.3rem',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '6px',
-                    }}
-                  >
-                    {availableSlots.map((s, idx) => {
-                      const isSelected = selectedSlot?.startsAt === s.startsAt;
-                      return (
-                        <button
-                          key={idx}
-                          type="button"
-                          disabled={!s.isAvailable}
-                          onClick={() => setSelectedSlot(s)}
-                          style={{
-                            padding: '0.4rem 0.2rem',
-                            fontSize: '0.775rem',
-                            fontWeight: 600,
-                            borderRadius: '4px',
-                            border: isSelected
-                              ? '2px solid var(--primary)'
-                              : s.isAvailable
-                              ? '1px solid #bbf7d0'
-                              : '1px solid #e2e8f0',
-                            backgroundColor: isSelected
-                              ? '#0d9488'
-                              : s.isAvailable
-                              ? '#f0fdf4'
-                              : '#f1f5f9',
-                            color: isSelected
-                              ? '#fff'
-                              : s.isAvailable
-                              ? '#166534'
-                              : '#94a3b8',
-                            cursor: s.isAvailable ? 'pointer' : 'not-allowed',
-                            transition: 'all 0.15s ease',
-                          }}
-                          title={s.isAvailable ? 'Available' : `Booked: ${s.patientName || 'Occupied'}`}
-                        >
-                          {s.timeDisplay}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  (() => {
+                    const grouped = groupTimeSlotsByShift(availableSlots);
+                    return (
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.5rem',
+                          maxHeight: '200px',
+                          overflowY: 'auto',
+                          padding: '0.45rem',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '6px',
+                          backgroundColor: '#fafafa',
+                        }}
+                      >
+                        {grouped.map((group, gIdx) => (
+                          <div key={gIdx} style={{ backgroundColor: '#ffffff', borderRadius: '6px', padding: '0.45rem 0.6rem', border: '1px solid #e2e8f0' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                              <strong style={{ fontSize: '0.775rem', color: '#0f766e' }}>
+                                {group.label}:
+                              </strong>
+                              <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                                {group.slots.filter((s) => s.isAvailable).length} open
+                              </span>
+                            </div>
+                            <div
+                              style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fill, minmax(78px, 1fr))',
+                                gap: '0.35rem',
+                              }}
+                            >
+                              {group.slots.map((s, idx) => {
+                                const isSelected = selectedSlot?.startsAt === s.startsAt;
+                                return (
+                                  <button
+                                    key={idx}
+                                    type="button"
+                                    disabled={!s.isAvailable}
+                                    onClick={() => setSelectedSlot(s)}
+                                    style={{
+                                      padding: '0.35rem 0.2rem',
+                                      fontSize: '0.75rem',
+                                      fontWeight: 600,
+                                      borderRadius: '4px',
+                                      border: isSelected
+                                        ? '2px solid var(--primary)'
+                                        : s.isAvailable
+                                        ? '1px solid #bbf7d0'
+                                        : '1px solid #e2e8f0',
+                                      backgroundColor: isSelected
+                                        ? '#0d9488'
+                                        : s.isAvailable
+                                        ? '#f0fdf4'
+                                        : '#f1f5f9',
+                                      color: isSelected
+                                        ? '#fff'
+                                        : s.isAvailable
+                                        ? '#166534'
+                                        : '#94a3b8',
+                                      cursor: s.isAvailable ? 'pointer' : 'not-allowed',
+                                      transition: 'all 0.15s ease',
+                                    }}
+                                    title={s.isAvailable ? `${s.timeDisplay} (Available)` : `Booked: ${s.patientName || 'Occupied'}`}
+                                  >
+                                    {formatSlotTime12(s.startsAt)}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()
                 )}
               </div>
 
@@ -1299,9 +1396,16 @@ export const Appointments: React.FC = () => {
               </div>
 
               <div style={{ marginBottom: '1rem' }}>
-                <label className="stat-label" style={{ display: 'block', marginBottom: '0.3rem' }}>
-                  Select New Slot *
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                  <label className="stat-label" style={{ margin: 0 }}>
+                    Select New Slot *
+                  </label>
+                  {rescheduleSelectedSlot && (
+                    <span style={{ fontSize: '0.725rem', color: '#16a34a', fontWeight: 600, backgroundColor: '#f0fdf4', padding: '0.15rem 0.45rem', borderRadius: '4px', border: '1px solid #bbf7d0' }}>
+                      Selected: {formatSlotTime12(rescheduleSelectedSlot.startsAt)} ({groupTimeSlotsByShift(rescheduleSlots).find(g => g.slots.some(s => s.startsAt === rescheduleSelectedSlot.startsAt))?.label || 'Shift'})
+                    </span>
+                  )}
+                </div>
                 {rescheduleLoading ? (
                   <div style={{ textAlign: 'center', padding: '1rem' }}>
                     <RefreshCw size={16} className="spin" />
@@ -1309,42 +1413,80 @@ export const Appointments: React.FC = () => {
                 ) : rescheduleSlots.length === 0 ? (
                   <div style={{ fontSize: '0.8rem', color: '#64748b' }}>No available slots on this date.</div>
                 ) : (
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(4, 1fr)',
-                      gap: '0.4rem',
-                      maxHeight: '160px',
-                      overflowY: 'auto',
-                      padding: '0.3rem',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '6px',
-                    }}
-                  >
-                    {rescheduleSlots.map((s, idx) => {
-                      const isSelected = rescheduleSelectedSlot?.startsAt === s.startsAt;
-                      return (
-                        <button
-                          key={idx}
-                          type="button"
-                          disabled={!s.isAvailable}
-                          onClick={() => setRescheduleSelectedSlot(s)}
-                          style={{
-                            padding: '0.35rem 0.2rem',
-                            fontSize: '0.75rem',
-                            fontWeight: 600,
-                            borderRadius: '4px',
-                            border: isSelected ? '2px solid var(--primary)' : '1px solid #bbf7d0',
-                            backgroundColor: isSelected ? 'var(--primary)' : s.isAvailable ? '#f0fdf4' : '#f1f5f9',
-                            color: isSelected ? '#fff' : s.isAvailable ? '#166534' : '#94a3b8',
-                            cursor: s.isAvailable ? 'pointer' : 'not-allowed',
-                          }}
-                        >
-                          {s.timeDisplay}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  (() => {
+                    const grouped = groupTimeSlotsByShift(rescheduleSlots);
+                    return (
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.45rem',
+                          maxHeight: '180px',
+                          overflowY: 'auto',
+                          padding: '0.4rem',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '6px',
+                          backgroundColor: '#fafafa',
+                        }}
+                      >
+                        {grouped.map((group, gIdx) => (
+                          <div key={gIdx} style={{ backgroundColor: '#ffffff', borderRadius: '6px', padding: '0.4rem 0.55rem', border: '1px solid #e2e8f0' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                              <strong style={{ fontSize: '0.75rem', color: '#0f766e' }}>
+                                {group.label}:
+                              </strong>
+                              <span style={{ fontSize: '0.675rem', color: '#64748b' }}>
+                                {group.slots.filter((s) => s.isAvailable).length} open
+                              </span>
+                            </div>
+                            <div
+                              style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fill, minmax(76px, 1fr))',
+                                gap: '0.3rem',
+                              }}
+                            >
+                              {group.slots.map((s, idx) => {
+                                const isSelected = rescheduleSelectedSlot?.startsAt === s.startsAt;
+                                return (
+                                  <button
+                                    key={idx}
+                                    type="button"
+                                    disabled={!s.isAvailable}
+                                    onClick={() => setRescheduleSelectedSlot(s)}
+                                    style={{
+                                      padding: '0.3rem 0.2rem',
+                                      fontSize: '0.75rem',
+                                      fontWeight: 600,
+                                      borderRadius: '4px',
+                                      border: isSelected
+                                        ? '2px solid var(--primary)'
+                                        : s.isAvailable
+                                        ? '1px solid #bbf7d0'
+                                        : '1px solid #e2e8f0',
+                                      backgroundColor: isSelected
+                                        ? 'var(--primary)'
+                                        : s.isAvailable
+                                        ? '#f0fdf4'
+                                        : '#f1f5f9',
+                                      color: isSelected
+                                        ? '#fff'
+                                        : s.isAvailable
+                                        ? '#166534'
+                                        : '#94a3b8',
+                                      cursor: s.isAvailable ? 'pointer' : 'not-allowed',
+                                    }}
+                                  >
+                                    {formatSlotTime12(s.startsAt)}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()
                 )}
               </div>
 
