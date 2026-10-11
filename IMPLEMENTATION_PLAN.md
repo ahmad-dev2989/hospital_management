@@ -114,6 +114,15 @@ This implementation plan tracks the lifecycle, phase progress, and module status
 - [x] Automated database backup scheduler (local drive + optional external drive) — **Tested**
 - [x] Database restoration verification tool — **Tested**
 
+### Module K: Integration & UX Polish (Phase 12)
+- [x] Unified non-blocking toast notifications (success, warning, error, info) with auto-dismiss — **Tested**
+- [x] Cross-module clinical workflow state (`NavigationContext`) linking Patient Chart, Appointments, Clinical Encounters, and Billing — **Tested**
+- [x] Global Command Palette (`CommandPalette.tsx`) triggered via `Ctrl+K` / `F2` with instant workstation jump, quick patient search, and action dispatch — **Tested**
+- [x] Global keyboard shortcuts (`Ctrl+1` through `Ctrl+9` for workstations, `Ctrl+B` for sidebar toggle, `Esc` to dismiss modals) — **Tested**
+- [x] Collapsible desktop sidebar mode (compact 68px icon navigation) — **Tested**
+- [x] Persistent Active Patient indicator pill with 1-click context clear in top header — **Tested**
+- [x] Complete thermal/laser print stylesheet (`@media print`) for invoices, prescriptions, barcodes, and reports — **Tested**
+
 ---
 
 ## 3. Technology Stack Alignment

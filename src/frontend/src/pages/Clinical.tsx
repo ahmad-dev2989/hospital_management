@@ -3,7 +3,6 @@ import {
   FileText,
   Activity,
   AlertTriangle,
-  CheckCircle2,
   Plus,
   RefreshCw,
   Search,
@@ -22,8 +21,18 @@ import {
   type Icd10CatalogItemDto,
   type ApiError
 } from '../api/client';
+import { useNavigation } from '../context/NavigationContext';
+import { useToast } from '../context/ToastContext';
 
 export const Clinical: React.FC = () => {
+  const {
+    activePatient,
+    setActivePatient,
+    workflowAction,
+    clearWorkflowAction
+  } = useNavigation();
+  const toast = useToast();
+
   const [encounters, setEncounters] = useState<EncounterDto[]>([]);
   const [selectedEncounter, setSelectedEncounter] = useState<EncounterDto | null>(null);
   const [loading, setLoading] = useState(false);
@@ -98,12 +107,10 @@ export const Clinical: React.FC = () => {
   const [rxAllergyWarning, setRxAllergyWarning] = useState<string | null>(null);
 
   // Feedback Toast
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
   const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+    toast.success(msg);
   };
 
   // 1. Initial lookups
@@ -158,12 +165,58 @@ export const Clinical: React.FC = () => {
     fetchEncounters();
   }, [statusFilter, selectedDate]);
 
+  // Phase 12: Handle cross-module workflow actions
+  useEffect(() => {
+    if (workflowAction) {
+      if (workflowAction.action === 'start-encounter') {
+        if (activePatient) {
+          setNewEncPatient(activePatient);
+          setPatientSearch(`${activePatient.fullName} (${activePatient.patientNumber})`);
+        }
+        setShowStartModal(true);
+        clearWorkflowAction();
+      }
+    }
+  }, [workflowAction, activePatient]);
+
+  const handleOpenStartModal = () => {
+    if (activePatient && !newEncPatient) {
+      setNewEncPatient(activePatient);
+      setPatientSearch(`${activePatient.fullName} (${activePatient.patientNumber})`);
+    }
+    setShowStartModal(true);
+  };
+
   // 3. Load full encounter details
   const loadEncounterDetails = async (id: string) => {
     setDetailsLoading(true);
     try {
       const full = await api.getEncounterById(id);
       setSelectedEncounter(full);
+      // Phase 12: Synchronize globally active patient context
+      const pDto: PatientDto = {
+        id: full.patientId,
+        patientNumber: full.patientNumber,
+        firstName: full.patientName.split(' ')[0] || '',
+        lastName: full.patientName.split(' ').slice(1).join(' ') || '',
+        fullName: full.patientName,
+        dateOfBirth: '',
+        age: full.patientAge,
+        gender: full.patientGender,
+        bloodGroup: full.patientBloodGroup ?? null,
+        phone: '',
+        email: null,
+        address: null,
+        emergencyContactName: null,
+        emergencyContactPhone: null,
+        isActive: true,
+        allergiesCount: full.patientAllergies?.length ?? 0,
+        hasHighRiskAllergy: full.patientHasHighRiskAllergy,
+        createdAt: '',
+        updatedAt: ''
+      };
+      setActivePatient(pDto);
+
       // Sync SOAP form with latest note
       const latestNote = full.notes.length > 0 ? full.notes[full.notes.length - 1] : null;
       if (latestNote) {
@@ -482,30 +535,6 @@ export const Clinical: React.FC = () => {
 
   return (
     <div className="module-container" style={{ padding: '0 0.5rem' }}>
-      {/* Toast Alert */}
-      {toastMessage && (
-        <div
-          style={{
-            position: 'fixed',
-            bottom: '24px',
-            right: '24px',
-            backgroundColor: '#0f172a',
-            color: '#fff',
-            padding: '12px 20px',
-            borderRadius: '8px',
-            boxShadow: '0 10px 15px -3px rgba(0,0,0,0.3)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            zIndex: 9999,
-            fontSize: '0.9rem',
-          }}
-        >
-          <CheckCircle2 size={18} color="#10b981" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
-
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
         <div>
@@ -529,7 +558,7 @@ export const Clinical: React.FC = () => {
           </button>
           <button
             className="btn btn-primary"
-            onClick={() => setShowStartModal(true)}
+            onClick={handleOpenStartModal}
             style={{ fontSize: '0.825rem', padding: '0.45rem 0.9rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
           >
             <Plus size={16} />

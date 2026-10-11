@@ -14,7 +14,10 @@ import {
   Droplet,
   UserCheck,
   UserX,
-  ShieldAlert
+  ShieldAlert,
+  Calendar,
+  FileText,
+  CreditCard
 } from 'lucide-react';
 import {
   api,
@@ -28,11 +31,22 @@ import {
   type AllergySeverity,
   type ApiError
 } from '../api/client';
+import { useNavigation } from '../context/NavigationContext';
+import { useToast } from '../context/ToastContext';
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const GENDERS = ['Male', 'Female', 'Other'];
 
 export const Patients: React.FC = () => {
+  const {
+    activePatient,
+    setActivePatient,
+    workflowAction,
+    clearWorkflowAction,
+    navigateWithWorkflow
+  } = useNavigation();
+  const toast = useToast();
+
   const [patients, setPatients] = useState<PatientDto[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -123,6 +137,19 @@ export const Patients: React.FC = () => {
     fetchPatients();
   }, [genderFilter, statusFilter]);
 
+  // Phase 12: Handle cross-module workflow actions
+  useEffect(() => {
+    if (workflowAction) {
+      if (workflowAction.action === 'register-patient') {
+        setShowRegisterModal(true);
+        clearWorkflowAction();
+      } else if (workflowAction.action === 'view-chart' && activePatient) {
+        handleOpenChart(activePatient);
+        clearWorkflowAction();
+      }
+    }
+  }, [workflowAction, activePatient]);
+
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     fetchPatients();
@@ -130,6 +157,7 @@ export const Patients: React.FC = () => {
 
   const handleOpenChart = async (patient: PatientDto) => {
     setSelectedPatient(patient);
+    setActivePatient(patient); // Phase 12: Synchronize globally active patient
     setChartLoading(true);
     setShowChartModal(true);
     setChartTab('summary');
@@ -137,7 +165,7 @@ export const Patients: React.FC = () => {
       const chart = await api.getPatientChart(patient.id);
       setActiveChart(chart);
     } catch (err: any) {
-      alert(`Error loading chart: ${err.message}`);
+      toast.error(err.message || 'Error loading clinical chart', 'Patient Chart Error');
     } finally {
       setChartLoading(false);
     }
@@ -918,7 +946,7 @@ export const Patients: React.FC = () => {
             )}
 
             {/* Patient Header Summary Pills */}
-            <div style={{ display: 'flex', gap: '1rem', padding: '0.75rem 0', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '1rem', padding: '0.75rem 0', borderBottom: '1px solid var(--border)', flexWrap: 'wrap', alignItems: 'center' }}>
               <span className="badge badge-info">Age: {selectedPatient.age} yrs</span>
               <span className="badge badge-info">Gender: {selectedPatient.gender}</span>
               {selectedPatient.bloodGroup && <span className="badge badge-danger">Blood: {selectedPatient.bloodGroup}</span>}
@@ -928,6 +956,51 @@ export const Patients: React.FC = () => {
                   ICE: {selectedPatient.emergencyContactName} ({selectedPatient.emergencyContactPhone})
                 </span>
               )}
+            </div>
+
+            {/* Phase 12: Cross-Module Clinical Workflow Actions Bar */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.6rem 0', borderBottom: '1px solid var(--border)', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                  Fast Actions:
+                </span>
+                <button
+                  className="btn btn-sm btn-outline"
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#0d9488', borderColor: '#99f6e4', backgroundColor: '#f0fdfa' }}
+                  onClick={() => {
+                    setShowChartModal(false);
+                    navigateWithWorkflow('appointments', selectedPatient, 'book-appointment');
+                  }}
+                  title="Schedule a clinical appointment for this patient"
+                >
+                  <Calendar size={13} />
+                  <span>Book Appointment</span>
+                </button>
+                <button
+                  className="btn btn-sm btn-outline"
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#2563eb', borderColor: '#bfdbfe', backgroundColor: '#eff6ff' }}
+                  onClick={() => {
+                    setShowChartModal(false);
+                    navigateWithWorkflow('clinical', selectedPatient, 'start-encounter');
+                  }}
+                  title="Open clinical workstation to record SOAP encounter note"
+                >
+                  <FileText size={13} />
+                  <span>Start Encounter</span>
+                </button>
+                <button
+                  className="btn btn-sm btn-outline"
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#7c3aed', borderColor: '#ddd6fe', backgroundColor: '#f5f3ff' }}
+                  onClick={() => {
+                    setShowChartModal(false);
+                    navigateWithWorkflow('billing', selectedPatient, 'view-invoices');
+                  }}
+                  title="View invoices and outstanding billing balance"
+                >
+                  <CreditCard size={13} />
+                  <span>View Invoices</span>
+                </button>
+              </div>
             </div>
 
             {/* Chart Sub Tabs */}

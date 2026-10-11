@@ -27,8 +27,16 @@ import {
   PAYMENT_METHOD_NAMES,
   type ApiError
 } from '../api/client';
+import { useNavigation } from '../context/NavigationContext';
+import { useToast } from '../context/ToastContext';
 
 export const Billing: React.FC = () => {
+  const {
+    activePatient,
+    workflowAction,
+    clearWorkflowAction
+  } = useNavigation();
+  const toast = useToast();
 
   // Active top-level tab
   const [activeTab, setActiveTab] = useState<'invoices' | 'terminal' | 'chargemaster' | 'shift'>('invoices');
@@ -95,12 +103,8 @@ export const Billing: React.FC = () => {
   const [refundReason, setRefundReason] = useState('Patient requested refund / Rescheduled service');
   const [refunding, setRefunding] = useState(false);
 
-  // Toast feedback
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-
   const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+    toast.success(msg);
   };
 
   // 1. Load Metrics
@@ -186,6 +190,22 @@ export const Billing: React.FC = () => {
     fetchShiftSummary();
     fetchPatients();
   }, []);
+
+  // Phase 12: Handle cross-module workflow actions
+  useEffect(() => {
+    if (workflowAction) {
+      if (workflowAction.action === 'open-terminal') {
+        setActiveTab('terminal');
+        clearWorkflowAction();
+      } else if (workflowAction.action === 'view-invoices') {
+        setActiveTab('invoices');
+        if (activePatient) {
+          setInvoiceSearch(activePatient.patientNumber || activePatient.fullName);
+        }
+        clearWorkflowAction();
+      }
+    }
+  }, [workflowAction, activePatient]);
 
   useEffect(() => {
     fetchInvoices();
@@ -383,31 +403,6 @@ export const Billing: React.FC = () => {
 
   return (
     <div className="tab-pane active" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div
-          style={{
-            position: 'fixed',
-            top: '1.5rem',
-            right: '1.5rem',
-            backgroundColor: '#0f172a',
-            color: '#fff',
-            padding: '0.75rem 1.25rem',
-            borderRadius: '8px',
-            boxShadow: '0 10px 15px -3px rgba(0,0,0,0.3)',
-            zIndex: 9999,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.6rem',
-            fontSize: '0.85rem',
-            animation: 'fadeIn 0.2s ease',
-          }}
-        >
-          <CheckCircle2 size={16} color="#10b981" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
-
       {/* Top Banner & Fast Metrics */}
       <div className="card" style={{ padding: '1rem 1.25rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

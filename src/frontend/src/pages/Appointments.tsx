@@ -11,7 +11,8 @@ import {
   Plus,
   RefreshCw,
   X,
-  AlertTriangle
+  AlertTriangle,
+  FileText
 } from 'lucide-react';
 import {
   api,
@@ -24,8 +25,19 @@ import {
   type AppointmentQueueSummaryDto,
   type ApiError
 } from '../api/client';
+import { useNavigation } from '../context/NavigationContext';
+import { useToast } from '../context/ToastContext';
 
 export const Appointments: React.FC = () => {
+  const {
+    activePatient,
+    setActivePatient,
+    workflowAction,
+    clearWorkflowAction,
+    navigateWithWorkflow
+  } = useNavigation();
+  const toast = useToast();
+
   const [appointments, setAppointments] = useState<AppointmentDto[]>([]);
   const [summary, setSummary] = useState<AppointmentQueueSummaryDto | null>(null);
   const [doctors, setDoctors] = useState<DoctorDto[]>([]);
@@ -69,11 +81,9 @@ export const Appointments: React.FC = () => {
   // UI status feedback
   const [actionLoading, setActionLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+    toast.success(msg);
   };
 
   // 1. Initial lookup data: Doctors & Departments
@@ -95,6 +105,28 @@ export const Appointments: React.FC = () => {
     };
     loadLookups();
   }, []);
+
+  // Phase 12: Cross-module workflow actions
+  useEffect(() => {
+    if (workflowAction) {
+      if (workflowAction.action === 'book-appointment') {
+        if (activePatient) {
+          setSelectedPatient(activePatient);
+          setPatientSearch(`${activePatient.fullName} (${activePatient.patientNumber})`);
+        }
+        setShowBookModal(true);
+        clearWorkflowAction();
+      }
+    }
+  }, [workflowAction, activePatient]);
+
+  const handleOpenBookModal = () => {
+    if (activePatient && !selectedPatient) {
+      setSelectedPatient(activePatient);
+      setPatientSearch(`${activePatient.fullName} (${activePatient.patientNumber})`);
+    }
+    setShowBookModal(true);
+  };
 
   // 2. Fetch Appointments & Queue Summary whenever filters change
   const fetchAppointments = async () => {
@@ -336,30 +368,6 @@ export const Appointments: React.FC = () => {
 
   return (
     <div className="module-container" style={{ padding: '0 0.5rem' }}>
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div
-          style={{
-            position: 'fixed',
-            bottom: '24px',
-            right: '24px',
-            backgroundColor: '#0f172a',
-            color: '#fff',
-            padding: '12px 20px',
-            borderRadius: '8px',
-            boxShadow: '0 10px 15px -3px rgba(0,0,0,0.3)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            zIndex: 9999,
-            fontSize: '0.9rem',
-          }}
-        >
-          <CheckCircle2 size={18} color="#10b981" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
-
       {/* Error Alert Banner */}
       {errorMessage && (
         <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', padding: '0.75rem 1rem', borderRadius: '6px', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
@@ -391,7 +399,7 @@ export const Appointments: React.FC = () => {
           </button>
           <button
             className="btn btn-primary"
-            onClick={() => setShowBookModal(true)}
+            onClick={handleOpenBookModal}
             style={{ fontSize: '0.825rem', padding: '0.45rem 0.9rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
           >
             <Plus size={16} />
@@ -681,6 +689,43 @@ export const Appointments: React.FC = () => {
                           >
                             <CheckCircle2 size={13} />
                             Complete
+                          </button>
+                        )}
+
+                        {/* Phase 12: Cross-Module Clinical Workstation Jump */}
+                        {a.status !== 6 && (
+                          <button
+                            className="btn btn-outline"
+                            onClick={() => {
+                              const patientObj: PatientDto = {
+                                id: a.patientId,
+                                patientNumber: a.patientNumber,
+                                firstName: a.patientName.split(' ')[0] || '',
+                                lastName: a.patientName.split(' ').slice(1).join(' ') || '',
+                                fullName: a.patientName,
+                                dateOfBirth: '',
+                                age: 0,
+                                gender: '',
+                                bloodGroup: null,
+                                phone: a.patientPhone || '',
+                                email: null,
+                                address: null,
+                                emergencyContactName: null,
+                                emergencyContactPhone: null,
+                                isActive: true,
+                                allergiesCount: 0,
+                                hasHighRiskAllergy: false,
+                                createdAt: '',
+                                updatedAt: '',
+                              };
+                              setActivePatient(patientObj);
+                              navigateWithWorkflow('clinical', patientObj, 'start-encounter', { appointmentId: a.id });
+                            }}
+                            style={{ fontSize: '0.725rem', padding: '0.25rem 0.5rem', color: '#0d9488', borderColor: '#99f6e4', backgroundColor: '#f0fdfa' }}
+                            title="Open Clinical Encounter note for this patient"
+                          >
+                            <FileText size={12} />
+                            Clinical
                           </button>
                         )}
 

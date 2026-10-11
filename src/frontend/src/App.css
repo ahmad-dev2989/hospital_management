@@ -722,3 +722,163 @@
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
+
+/* =========================================================================
+   PHASE 12: INTEGRATION & DESKTOP UX POLISH
+   ========================================================================= */
+
+/* Collapsible Sidebar Mode */
+.sidebar.collapsed {
+  width: 68px;
+  transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar.collapsed .brand-title,
+.sidebar.collapsed .brand-sub,
+.sidebar.collapsed .nav-item-text,
+.sidebar.collapsed .nav-badge,
+.sidebar.collapsed .user-info-text {
+  display: none;
+}
+
+.sidebar.collapsed .brand-icon-wrapper {
+  margin: 0 auto;
+}
+
+.sidebar.collapsed .nav-item {
+  justify-content: center;
+  padding: 0.65rem 0;
+}
+
+.sidebar.collapsed .sidebar-footer {
+  justify-content: center;
+  padding: 0.85rem 0;
+}
+
+/* Toast Animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Command Palette Backdrop Animation */
+.animate-slide-in {
+  animation: fadeInUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Active Patient Header Indicator */
+.active-patient-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: #f0fdfa;
+  border: 1px solid #99f6e4;
+  color: #0f766e;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.active-patient-clear {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #0d9488;
+  display: flex;
+  align-items: center;
+  padding: 0;
+  border-radius: 50%;
+}
+.active-patient-clear:hover {
+  color: #ef4444;
+}
+
+/* Global Shortcut Kbd Badge */
+.shortcut-badge {
+  font-size: 0.65rem;
+  font-family: var(--font-mono);
+  background-color: #1e293b;
+  color: #94a3b8;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  border: 1px solid #334155;
+  margin-left: auto;
+}
+
+/* Comprehensive Laser & Thermal Printer Print Stylesheet */
+@media print {
+  body {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .app-container {
+    height: auto !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+  }
+
+  .sidebar,
+  .top-header,
+  .toast-container,
+  .modal-backdrop,
+  .btn,
+  button,
+  input,
+  select,
+  .card-actions,
+  .no-print {
+    display: none !important;
+  }
+
+  .main-area {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    overflow: visible !important;
+  }
+
+  .main-content {
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  .card {
+    border: 1px solid #cbd5e1 !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+    padding: 1rem !important;
+    margin-bottom: 1rem !important;
+  }
+
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  th, td {
+    border: 1px solid #e2e8f0 !important;
+    padding: 0.4rem 0.6rem !important;
+    color: #000000 !important;
+    font-size: 0.8rem !important;
+  }
+
+  th {
+    background-color: #f8fafc !important;
+  }
+
+  .badge {
+    border: 1px solid #64748b !important;
+    background: transparent !important;
+    color: #000000 !important;
+  }
+}

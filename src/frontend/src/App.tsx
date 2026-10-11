@@ -19,10 +19,16 @@ import {
   UserCheck,
   FileSearch,
   LogOut,
-  KeyRound
+  KeyRound,
+  Menu,
+  Search,
+  X
 } from 'lucide-react';
 import { api, type HealthStatus, type DatabaseHealthStatus, type ApiError } from './api/client';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ToastProvider } from './context/ToastContext';
+import { NavigationProvider, useNavigation } from './context/NavigationContext';
+import { CommandPalette } from './components/CommandPalette';
 import { Login } from './pages/Login';
 import { UserManagement } from './pages/UserManagement';
 import { AuditLogs } from './pages/AuditLogs';
@@ -38,7 +44,15 @@ import './App.css';
 
 function MainAppShell() {
   const { user, isAuthenticated, isLoading, isAdmin, hasRole, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState('foundation');
+  const {
+    activeTab,
+    setActiveTab,
+    isSidebarCollapsed,
+    toggleSidebar,
+    activePatient,
+    clearActivePatient,
+    openCommandPalette,
+  } = useNavigation();
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString());
   const [apiHealth, setApiHealth] = useState<HealthStatus | null>(null);
   const [dbHealth, setDbHealth] = useState<DatabaseHealthStatus | null>(null);
@@ -148,12 +162,66 @@ function MainAppShell() {
     { id: 'settings', label: 'Administration', icon: Settings, badge: 'Phase 11' },
   ];
 
+  // Phase 12: Global Keyboard Shortcuts Listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't intercept if actively typing in form inputs, textareas, or selects
+      const targetTag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      const isInput = targetTag === 'input' || targetTag === 'textarea' || targetTag === 'select';
+
+      // Ctrl+K or F2: Global Command Palette (works anywhere)
+      if ((e.ctrlKey && e.key.toLowerCase() === 'k') || e.key === 'F2') {
+        e.preventDefault();
+        openCommandPalette();
+        return;
+      }
+
+      // Ctrl+B: Toggle Sidebar Collapse (works anywhere)
+      if (e.ctrlKey && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        toggleSidebar();
+        return;
+      }
+
+      // If user is typing in an input, don't trigger number navigation
+      if (isInput) return;
+
+      // Ctrl+1 through Ctrl+9: Quick Workstation Navigation
+      if (e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey) {
+        const digit = e.key;
+        const shortcutMap: Record<string, string> = {
+          '1': 'foundation',
+          '2': isAdmin ? 'users' : 'patients',
+          '3': (isAdmin || hasRole('Auditor')) ? 'audit' : 'patients',
+          '4': 'patients',
+          '5': 'appointments',
+          '6': 'clinical',
+          '7': 'laboratory',
+          '8': 'pharmacy',
+          '9': 'billing',
+        };
+        if (shortcutMap[digit]) {
+          e.preventDefault();
+          setActiveTab(shortcutMap[digit]);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [openCommandPalette, toggleSidebar, setActiveTab, isAdmin, hasRole]);
+
   return (
     <div className="app-container">
       {/* Sidebar Navigation */}
-      <aside className="sidebar">
+      <aside className={`sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}>
         <div className="sidebar-brand">
-          <div className="brand-icon-wrapper">
+          <div
+            className="brand-icon-wrapper"
+            onClick={toggleSidebar}
+            style={{ cursor: 'pointer' }}
+            title={isSidebarCollapsed ? 'Expand Sidebar (Ctrl+B)' : 'Collapse Sidebar (Ctrl+B)'}
+          >
             <Activity size={22} strokeWidth={2.5} />
           </div>
           <div>
@@ -171,11 +239,13 @@ function MainAppShell() {
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
                 className={`nav-item ${isActive ? 'active' : ''}`}
+                title={isSidebarCollapsed ? item.label : undefined}
               >
                 <Icon size={18} />
-                <span style={{ flex: 1 }}>{item.label}</span>
+                <span className="nav-item-text" style={{ flex: 1 }}>{item.label}</span>
                 {item.badge && (
                   <span
+                    className="nav-badge"
                     style={{
                       fontSize: '0.65rem',
                       padding: '2px 6px',
@@ -198,7 +268,7 @@ function MainAppShell() {
             <div className="avatar-circle">
               {user?.fullName ? user.fullName.slice(0, 2).toUpperCase() : 'US'}
             </div>
-            <div style={{ minWidth: 0 }}>
+            <div className="user-info-text" style={{ minWidth: 0 }}>
               <div className="user-name" title={user?.fullName || ''}>
                 {user?.fullName || 'User'}
               </div>
@@ -237,16 +307,73 @@ function MainAppShell() {
       <main className="main-area">
         {/* Header */}
         <header className="top-header">
-          <div className="header-left">
-            <h1 className="page-title">
+          <div className="header-left" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <button
+              onClick={toggleSidebar}
+              title="Toggle Desktop Sidebar (Ctrl+B)"
+              style={{
+                background: 'none',
+                border: '1px solid #e2e8f0',
+                borderRadius: '6px',
+                padding: '0.35rem 0.5rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                color: '#64748b',
+              }}
+            >
+              <Menu size={16} />
+            </button>
+            <h1 className="page-title" style={{ margin: 0 }}>
               {navItems.find((n) => n.id === activeTab)?.label || 'System Foundation'}
             </h1>
             <span className="badge badge-info" style={{ textTransform: 'capitalize' }}>
               {user?.roleName}
             </span>
+
+            {/* Active Patient Pill Indicator */}
+            {activePatient && (
+              <div className="active-patient-pill" title="Active Patient Workflow Context">
+                <Users size={13} color="#0d9488" />
+                <span>
+                  Patient: <strong>{activePatient.fullName}</strong> ({activePatient.patientNumber})
+                </span>
+                <button
+                  onClick={clearActivePatient}
+                  className="active-patient-clear"
+                  title="Clear active patient context"
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            )}
           </div>
 
-          <div className="header-right">
+          <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            {/* Command Palette Trigger Button */}
+            <button
+              onClick={openCommandPalette}
+              className="btn btn-outline"
+              style={{
+                padding: '0.3rem 0.65rem',
+                fontSize: '0.8rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                backgroundColor: '#f8fafc',
+                borderColor: '#cbd5e1',
+                color: '#475569',
+                cursor: 'pointer',
+              }}
+              title="Open Global Command Palette (Ctrl+K or F2)"
+            >
+              <Search size={14} color="#0d9488" />
+              <span>Quick Search</span>
+              <kbd style={{ fontSize: '0.675rem', padding: '1px 5px', background: '#e2e8f0', borderRadius: '3px', fontWeight: 600 }}>
+                Ctrl+K
+              </kbd>
+            </button>
+
             {/* API Status Pill */}
             <div className="status-pill">
               <span className={`dot ${apiHealth?.status === 'Healthy' ? 'online' : 'offline'}`} />
@@ -543,6 +670,9 @@ function MainAppShell() {
           </div>
         </div>
       )}
+
+      {/* Global Command Palette Overlay */}
+      <CommandPalette />
     </div>
   );
 }
@@ -550,7 +680,12 @@ function MainAppShell() {
 export default function App() {
   return (
     <AuthProvider>
-      <MainAppShell />
+      <ToastProvider>
+        <NavigationProvider>
+          <MainAppShell />
+        </NavigationProvider>
+      </ToastProvider>
     </AuthProvider>
   );
 }
+
