@@ -16,7 +16,6 @@ import {
   ShieldCheck,
   CheckCircle2,
   AlertCircle,
-  UserCheck,
   FileSearch,
   LogOut,
   KeyRound,
@@ -149,17 +148,16 @@ function MainAppShell() {
   };
 
   const navItems = [
-    { id: 'foundation', label: 'System Foundation', icon: Server, badge: 'Phase 2' },
-    ...(isAdmin ? [{ id: 'users', label: 'Staff & RBAC', icon: UserCheck, badge: 'Phase 3' }] : []),
-    ...(isAdmin || hasRole('Auditor') ? [{ id: 'audit', label: 'Security Audit Log', icon: FileSearch, badge: 'Phase 3' }] : []),
-    { id: 'patients', label: 'Patients', icon: Users, badge: 'Phase 4' },
-    { id: 'appointments', label: 'Appointments', icon: Calendar, badge: 'Phase 5' },
-    { id: 'clinical', label: 'Clinical Encounters', icon: FileText, badge: 'Phase 6' },
-    { id: 'laboratory', label: 'Laboratory', icon: FlaskConical, badge: 'Phase 7' },
-    { id: 'pharmacy', label: 'Pharmacy & Stock', icon: Pill, badge: 'Phase 8' },
-    { id: 'billing', label: 'Billing & Cashier', icon: CreditCard, badge: 'Phase 9' },
-    { id: 'reports', label: 'Reports & Analytics', icon: BarChart3, badge: 'Phase 10' },
-    { id: 'settings', label: 'Administration', icon: Settings, badge: 'Phase 11' },
+    { id: 'reports', label: 'Executive Dashboard', icon: BarChart3 },
+    { id: 'patients', label: 'Patients', icon: Users },
+    { id: 'appointments', label: 'Appointments', icon: Calendar },
+    { id: 'clinical', label: 'Clinical Encounters', icon: FileText },
+    { id: 'laboratory', label: 'Laboratory', icon: FlaskConical },
+    { id: 'pharmacy', label: 'Pharmacy & Stock', icon: Pill },
+    { id: 'billing', label: 'Billing & Cashier', icon: CreditCard },
+    ...(isAdmin ? [{ id: 'settings', label: 'Administration', icon: Settings }] : []),
+    ...(isAdmin || hasRole('Auditor') ? [{ id: 'audit', label: 'Security Audit Log', icon: FileSearch }] : []),
+    { id: 'foundation', label: 'System Diagnostics', icon: Server },
   ];
 
   // Phase 12: Global Keyboard Shortcuts Listener
@@ -190,15 +188,15 @@ function MainAppShell() {
       if (e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey) {
         const digit = e.key;
         const shortcutMap: Record<string, string> = {
-          '1': 'foundation',
-          '2': isAdmin ? 'users' : 'patients',
-          '3': (isAdmin || hasRole('Auditor')) ? 'audit' : 'patients',
-          '4': 'patients',
-          '5': 'appointments',
-          '6': 'clinical',
-          '7': 'laboratory',
-          '8': 'pharmacy',
-          '9': 'billing',
+          '1': 'reports',
+          '2': 'patients',
+          '3': 'appointments',
+          '4': 'clinical',
+          '5': 'laboratory',
+          '6': 'pharmacy',
+          '7': 'billing',
+          '8': isAdmin ? 'settings' : 'reports',
+          '9': 'foundation',
         };
         if (shortcutMap[digit]) {
           e.preventDefault();
@@ -243,20 +241,6 @@ function MainAppShell() {
               >
                 <Icon size={18} />
                 <span className="nav-item-text" style={{ flex: 1 }}>{item.label}</span>
-                {item.badge && (
-                  <span
-                    className="nav-badge"
-                    style={{
-                      fontSize: '0.65rem',
-                      padding: '2px 6px',
-                      borderRadius: '4px',
-                      backgroundColor: isActive ? 'rgba(255,255,255,0.2)' : '#1e293b',
-                      color: isActive ? '#fff' : '#94a3b8',
-                    }}
-                  >
-                    {item.badge}
-                  </span>
-                )}
               </button>
             );
           })}

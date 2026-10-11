@@ -31,7 +31,7 @@ interface NavigationContextType {
 const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
 
 export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [activeTab, setActiveTabState] = useState<string>('foundation');
+  const [activeTab, setActiveTabState] = useState<string>('reports');
   const [activePatient, setActivePatient] = useState<PatientDto | null>(null);
   const [workflowAction, setWorkflowAction] = useState<WorkflowAction | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);

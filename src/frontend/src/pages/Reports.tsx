@@ -223,7 +223,7 @@ export const Reports: React.FC = () => {
               Reports & Executive Analytics
             </h1>
             <span className="badge badge-success" style={{ fontSize: '0.75rem', fontWeight: 600 }}>
-              Module H
+              Live Analytics
             </span>
           </div>
           <p style={{ margin: '0.35rem 0 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>

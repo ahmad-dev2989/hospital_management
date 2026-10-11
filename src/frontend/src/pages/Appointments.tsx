@@ -10,7 +10,6 @@ import {
   Search,
   Plus,
   RefreshCw,
-  X,
   AlertTriangle,
   FileText
 } from 'lucide-react';
@@ -773,25 +772,25 @@ export const Appointments: React.FC = () => {
       {/* MODAL 1: BOOK APPOINTMENT */}
       {showBookModal && (
         <div className="modal-backdrop">
-          <div className="modal-card" style={{ maxWidth: '640px', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 style={{ fontSize: '1.15rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <CalendarIcon size={18} color="var(--primary)" />
+          <div className="modal-content card" style={{ maxWidth: '640px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div className="modal-header">
+              <h2 style={{ fontSize: '1.15rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-main)' }}>
+                <CalendarIcon size={20} color="var(--primary)" />
                 Book Clinic Appointment
               </h2>
               <button
-                className="btn btn-outline"
+                className="modal-close"
                 onClick={() => setShowBookModal(false)}
-                style={{ padding: '0.3rem', border: 'none' }}
+                title="Close modal"
               >
-                <X size={16} />
+                ×
               </button>
             </div>
 
             <form onSubmit={handleBookSubmit}>
               {/* Step 1: Patient Selection */}
               <div style={{ marginBottom: '1rem' }}>
-                <label className="stat-label" style={{ display: 'block', marginBottom: '0.3rem' }}>
+                <label className="form-label" style={{ display: 'block', marginBottom: '0.35rem' }}>
                   1. Select Patient *
                 </label>
                 {selectedPatient ? (
@@ -875,7 +874,7 @@ export const Appointments: React.FC = () => {
               {/* Step 2: Doctor and Date Selection */}
               <div className="grid-2" style={{ gap: '0.75rem', marginBottom: '1rem' }}>
                 <div>
-                  <label className="stat-label" style={{ display: 'block', marginBottom: '0.3rem' }}>
+                  <label className="form-label" style={{ display: 'block', marginBottom: '0.35rem' }}>
                     2. Attending Physician *
                   </label>
                   <select
@@ -893,7 +892,7 @@ export const Appointments: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="stat-label" style={{ display: 'block', marginBottom: '0.3rem' }}>
+                  <label className="form-label" style={{ display: 'block', marginBottom: '0.35rem' }}>
                     3. Target Date *
                   </label>
                   <input
@@ -909,7 +908,7 @@ export const Appointments: React.FC = () => {
               {/* Step 3: Interactive Visual Slot Picker */}
               <div style={{ marginBottom: '1rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                  <label className="stat-label" style={{ margin: 0 }}>
+                  <label className="form-label" style={{ margin: 0 }}>
                     4. Select Available Time Slot *
                   </label>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
@@ -983,7 +982,7 @@ export const Appointments: React.FC = () => {
 
               {/* Reason / Notes */}
               <div style={{ marginBottom: '1.25rem' }}>
-                <label className="stat-label" style={{ display: 'block', marginBottom: '0.3rem' }}>
+                <label className="form-label" style={{ display: 'block', marginBottom: '0.35rem' }}>
                   Chief Complaint / Visit Reason
                 </label>
                 <textarea
@@ -997,7 +996,7 @@ export const Appointments: React.FC = () => {
               </div>
 
               {/* Submit / Cancel Buttons */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
+              <div className="modal-actions">
                 <button
                   type="button"
                   className="btn btn-outline"
@@ -1022,21 +1021,21 @@ export const Appointments: React.FC = () => {
       {/* MODAL 2: RESCHEDULE APPOINTMENT */}
       {showRescheduleModal && activeAppointment && (
         <div className="modal-backdrop">
-          <div className="modal-card" style={{ maxWidth: '560px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 style={{ fontSize: '1.15rem', fontWeight: 700, margin: 0 }}>
+          <div className="modal-content card" style={{ maxWidth: '560px' }}>
+            <div className="modal-header">
+              <h2 style={{ fontSize: '1.15rem', fontWeight: 700, margin: 0, color: 'var(--text-main)' }}>
                 Reschedule {activeAppointment.appointmentNumber}
               </h2>
               <button
-                className="btn btn-outline"
+                className="modal-close"
                 onClick={() => setShowRescheduleModal(false)}
-                style={{ padding: '0.3rem', border: 'none' }}
+                title="Close modal"
               >
-                <X size={16} />
+                ×
               </button>
             </div>
 
-            <div style={{ padding: '0.6rem 0.8rem', backgroundColor: '#f8fafc', borderRadius: '6px', marginBottom: '1rem', fontSize: '0.825rem' }}>
+            <div style={{ padding: '0.6rem 0.8rem', backgroundColor: '#f8fafc', borderRadius: '6px', marginBottom: '1rem', fontSize: '0.825rem', border: '1px solid var(--border)' }}>
               <div>Patient: <strong>{activeAppointment.patientName}</strong> ({activeAppointment.patientNumber})</div>
               <div>Doctor: <strong>{activeAppointment.doctorName}</strong></div>
               <div>Current Slot: <strong>{new Date(activeAppointment.startsAt).toLocaleDateString()} {formatSlotTime(activeAppointment.startsAt)}</strong></div>
@@ -1044,7 +1043,7 @@ export const Appointments: React.FC = () => {
 
             <form onSubmit={handleRescheduleSubmit}>
               <div style={{ marginBottom: '1rem' }}>
-                <label className="stat-label" style={{ display: 'block', marginBottom: '0.3rem' }}>
+                <label className="form-label" style={{ display: 'block', marginBottom: '0.35rem' }}>
                   Target New Date *
                 </label>
                 <input
@@ -1143,18 +1142,18 @@ export const Appointments: React.FC = () => {
       {/* MODAL 3: CANCEL APPOINTMENT */}
       {showCancelModal && activeAppointment && (
         <div className="modal-backdrop">
-          <div className="modal-card" style={{ maxWidth: '480px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <div className="modal-content card" style={{ maxWidth: '480px' }}>
+            <div className="modal-header">
               <h2 style={{ fontSize: '1.15rem', fontWeight: 700, margin: 0, color: '#dc2626', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <AlertTriangle size={18} />
                 Cancel Appointment
               </h2>
               <button
-                className="btn btn-outline"
+                className="modal-close"
                 onClick={() => setShowCancelModal(false)}
-                style={{ padding: '0.3rem', border: 'none' }}
+                title="Close modal"
               >
-                <X size={16} />
+                ×
               </button>
             </div>
 
@@ -1165,7 +1164,7 @@ export const Appointments: React.FC = () => {
 
             <form onSubmit={handleCancelSubmit}>
               <div style={{ marginBottom: '1.25rem' }}>
-                <label className="stat-label" style={{ display: 'block', marginBottom: '0.3rem' }}>
+                <label className="form-label" style={{ display: 'block', marginBottom: '0.35rem' }}>
                   Mandatory Cancellation Reason *
                 </label>
                 <input
@@ -1179,21 +1178,20 @@ export const Appointments: React.FC = () => {
                 />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
+              <div className="modal-actions">
                 <button
                   type="button"
                   className="btn btn-outline"
                   onClick={() => setShowCancelModal(false)}
                 >
-                  Keep Appointment
+                  Back
                 </button>
                 <button
                   type="submit"
-                  className="btn btn-primary"
-                  style={{ backgroundColor: '#dc2626', borderColor: '#dc2626' }}
+                  className="btn btn-danger"
                   disabled={actionLoading || !cancelReason.trim()}
                 >
-                  {actionLoading ? 'Cancelling...' : 'Cancel Appointment'}
+                  {actionLoading ? 'Cancelling...' : 'Confirm Cancellation'}
                 </button>
               </div>
             </form>

@@ -223,7 +223,8 @@ export interface PatientChartDto {
   recentVitals: PatientVitalSignSummaryDto[];
   totalAppointments: number;
   totalInvoices: number;
-  outstandingBalance: number;
+  totalOutstandingBalance: number;
+  outstandingBalance?: number;
 }
 
 class ApiClient {

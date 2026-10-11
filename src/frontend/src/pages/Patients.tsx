@@ -933,7 +933,7 @@ export const Patients: React.FC = () => {
             </div>
 
             {/* CRITICAL ALLERGY BANNER IF HIGH RISK */}
-            {activeChart?.demographics.hasHighRiskAllergy && (
+            {activeChart?.demographics?.hasHighRiskAllergy && (
               <div style={{ backgroundColor: '#fee2e2', border: '1px solid #f87171', color: '#991b1b', padding: '0.75rem 1rem', borderRadius: '6px', margin: '0.75rem 0', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <ShieldAlert size={22} />
                 <div>
@@ -1015,19 +1015,19 @@ export const Patients: React.FC = () => {
                 className={`btn btn-sm ${chartTab === 'allergies' ? 'btn-primary' : 'btn-outline'}`}
                 onClick={() => setChartTab('allergies')}
               >
-                Allergies ({activeChart?.allergies.length ?? 0})
+                Allergies ({activeChart?.allergies?.length ?? 0})
               </button>
               <button
                 className={`btn btn-sm ${chartTab === 'conditions' ? 'btn-primary' : 'btn-outline'}`}
                 onClick={() => setChartTab('conditions')}
               >
-                Conditions ({activeChart?.conditions.length ?? 0})
+                Conditions ({activeChart?.conditions?.length ?? 0})
               </button>
               <button
                 className={`btn btn-sm ${chartTab === 'encounters' ? 'btn-primary' : 'btn-outline'}`}
                 onClick={() => setChartTab('encounters')}
               >
-                Visits & Encounters ({activeChart?.recentEncounters.length ?? 0})
+                Visits & Encounters ({activeChart?.recentEncounters?.length ?? 0})
               </button>
             </div>
 
@@ -1047,26 +1047,26 @@ export const Patients: React.FC = () => {
                         <div style={{ padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid var(--border)' }}>
                           <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>ENCOUNTERS</span>
                           <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                            {activeChart.recentEncounters.length}
+                            {activeChart.recentEncounters?.length ?? 0}
                           </div>
                         </div>
                         <div style={{ padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid var(--border)' }}>
                           <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>CHRONIC CONDITIONS</span>
                           <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                            {activeChart.conditions.length}
+                            {activeChart.conditions?.length ?? 0}
                           </div>
                         </div>
                         <div style={{ padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid var(--border)' }}>
                           <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>OUTSTANDING BALANCE</span>
-                          <div style={{ fontSize: '1.25rem', fontWeight: 700, color: activeChart.outstandingBalance > 0 ? '#b91c1c' : '#15803d' }}>
-                            ${activeChart.outstandingBalance.toFixed(2)}
+                          <div style={{ fontSize: '1.25rem', fontWeight: 700, color: ((activeChart.totalOutstandingBalance ?? activeChart.outstandingBalance ?? 0) > 0) ? '#b91c1c' : '#15803d' }}>
+                            ${(activeChart.totalOutstandingBalance ?? activeChart.outstandingBalance ?? 0).toFixed(2)}
                           </div>
                         </div>
                       </div>
 
                       {/* Recent Vitals */}
                       <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '0.5rem' }}>Latest Recorded Vitals</h4>
-                      {activeChart.recentVitals.length === 0 ? (
+                      {(activeChart.recentVitals?.length ?? 0) === 0 ? (
                         <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)' }}>No vitals recorded yet.</p>
                       ) : (
                         <div className="table-wrapper" style={{ marginTop: 0 }}>
@@ -1081,7 +1081,7 @@ export const Patients: React.FC = () => {
                               </tr>
                             </thead>
                             <tbody>
-                              {activeChart.recentVitals.map((v) => (
+                              {(activeChart.recentVitals ?? []).map((v) => (
                                 <tr key={v.id}>
                                   <td>{new Date(v.recordedAt).toLocaleString()}</td>
                                   <td>{v.bloodPressure}</td>
@@ -1115,7 +1115,7 @@ export const Patients: React.FC = () => {
                         </button>
                       </div>
 
-                      {activeChart.allergies.length === 0 ? (
+                      {(activeChart.allergies?.length ?? 0) === 0 ? (
                         <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', backgroundColor: '#f8fafc', borderRadius: '6px' }}>
                           No drug or food allergies documented for this patient.
                         </div>
@@ -1132,7 +1132,7 @@ export const Patients: React.FC = () => {
                               </tr>
                             </thead>
                             <tbody>
-                              {activeChart.allergies.map((a) => {
+                              {(activeChart.allergies ?? []).map((a) => {
                                 const badge = getAllergySeverityBadge(a.severity);
                                 return (
                                   <tr key={a.id}>
@@ -1192,7 +1192,7 @@ export const Patients: React.FC = () => {
                         </button>
                       </div>
 
-                      {activeChart.conditions.length === 0 ? (
+                      {(activeChart.conditions?.length ?? 0) === 0 ? (
                         <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', backgroundColor: '#f8fafc', borderRadius: '6px' }}>
                           No chronic medical conditions recorded.
                         </div>
@@ -1208,7 +1208,7 @@ export const Patients: React.FC = () => {
                               </tr>
                             </thead>
                             <tbody>
-                              {activeChart.conditions.map((c) => (
+                              {(activeChart.conditions ?? []).map((c) => (
                                 <tr key={c.id}>
                                   <td><strong>{c.conditionName}</strong></td>
                                   <td><span className="badge badge-info">{c.status}</span></td>
@@ -1235,7 +1235,7 @@ export const Patients: React.FC = () => {
                   {/* TAB 4: ENCOUNTERS */}
                   {chartTab === 'encounters' && activeChart && (
                     <div>
-                      {activeChart.recentEncounters.length === 0 ? (
+                      {(activeChart.recentEncounters?.length ?? 0) === 0 ? (
                         <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', backgroundColor: '#f8fafc', borderRadius: '6px' }}>
                           No prior encounters recorded for this patient.
                         </div>
@@ -1251,7 +1251,7 @@ export const Patients: React.FC = () => {
                               </tr>
                             </thead>
                             <tbody>
-                              {activeChart.recentEncounters.map((e) => (
+                              {(activeChart.recentEncounters ?? []).map((e) => (
                                 <tr key={e.id}>
                                   <td>{new Date(e.encounterDate).toLocaleDateString()}</td>
                                   <td><strong>{e.doctorName}</strong></td>

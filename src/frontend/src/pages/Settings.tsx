@@ -16,7 +16,8 @@ import {
   ShieldCheck,
   Search,
   Layers,
-  Sparkles
+  Sparkles,
+  UserCheck
 } from 'lucide-react';
 import {
   api,
@@ -28,9 +29,11 @@ import {
   type DocumentCategory,
   type ApiError
 } from '../api/client';
+import { UserManagement } from './UserManagement';
+import { AuditLogs } from './AuditLogs';
 
 export const Settings: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'profile' | 'documents' | 'backups' | 'telemetry'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'users' | 'audit' | 'documents' | 'backups' | 'telemetry'>('profile');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -307,14 +310,14 @@ export const Settings: React.FC = () => {
               <SettingsIcon size={20} />
             </div>
             <h1 style={{ fontSize: '1.4rem', fontWeight: 700, margin: 0, color: 'var(--text-main)' }}>
-              System Administration & Storage
+              Hospital Administration Center
             </h1>
-            <span className="badge badge-success" style={{ fontSize: '0.75rem', fontWeight: 600 }}>
-              Phase 11 (Modules I & J)
+            <span className="badge badge-info" style={{ fontSize: '0.75rem', fontWeight: 600 }}>
+              Administrative Hub
             </span>
           </div>
           <p style={{ margin: '0.35rem 0 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            Hospital profile configuration, local clinical document repository, automated database backup & telemetry.
+            Hospital profile configuration, staff user accounts & RBAC, immutable security audit trail, and database maintenance.
           </p>
         </div>
 
@@ -362,6 +365,48 @@ export const Settings: React.FC = () => {
         >
           <Building2 size={16} />
           Hospital Profile & Config
+        </button>
+
+        <button
+          onClick={() => setActiveTab('users')}
+          style={{
+            padding: '0.65rem 1.25rem',
+            border: 'none',
+            borderBottom: activeTab === 'users' ? '3px solid #0d9488' : '3px solid transparent',
+            color: activeTab === 'users' ? '#0d9488' : 'var(--text-muted)',
+            fontWeight: activeTab === 'users' ? 700 : 500,
+            fontSize: '0.875rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            background: 'none',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease'
+          }}
+        >
+          <UserCheck size={16} />
+          Staff & RBAC Accounts
+        </button>
+
+        <button
+          onClick={() => setActiveTab('audit')}
+          style={{
+            padding: '0.65rem 1.25rem',
+            border: 'none',
+            borderBottom: activeTab === 'audit' ? '3px solid #0d9488' : '3px solid transparent',
+            color: activeTab === 'audit' ? '#0d9488' : 'var(--text-muted)',
+            fontWeight: activeTab === 'audit' ? 700 : 500,
+            fontSize: '0.875rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            background: 'none',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease'
+          }}
+        >
+          <ShieldCheck size={16} />
+          Security Audit Trail
         </button>
 
         <button
@@ -1065,6 +1110,20 @@ export const Settings: React.FC = () => {
 
           </div>
 
+        </div>
+      )}
+
+      {/* TAB 2: STAFF & USERS (RBAC) */}
+      {activeTab === 'users' && (
+        <div style={{ marginTop: '0.5rem' }}>
+          <UserManagement />
+        </div>
+      )}
+
+      {/* TAB 3: SECURITY AUDIT TRAIL */}
+      {activeTab === 'audit' && (
+        <div style={{ marginTop: '0.5rem' }}>
+          <AuditLogs />
         </div>
       )}
 

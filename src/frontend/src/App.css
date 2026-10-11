@@ -309,7 +309,11 @@
   color: var(--text-main);
 }
 
-.form-input {
+.form-input,
+.input-field,
+select.input-field,
+textarea.input-field,
+.form-select {
   width: 100%;
   padding: 0.55rem 0.75rem;
   border: 1px solid var(--border-strong);
@@ -318,12 +322,23 @@
   color: var(--text-main);
   background-color: var(--bg-surface);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  box-sizing: border-box;
+  font-family: inherit;
 }
 
-.form-input:focus {
+.form-input:focus,
+.input-field:focus,
+select.input-field:focus,
+textarea.input-field:focus,
+.form-select:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.15);
   outline: none;
+}
+
+.form-input::placeholder,
+.input-field::placeholder {
+  color: #94a3b8;
 }
 
 .input-group {
@@ -480,13 +495,19 @@
   padding: 1.5rem;
 }
 
-.modal-content {
+.modal-content,
+.modal-card {
   width: 100%;
-  max-width: 520px;
-  background-color: var(--bg-surface);
-  box-shadow: var(--shadow-lg);
-  border-radius: 8px;
-  animation: modalPop 0.15s ease-out;
+  max-width: 560px;
+  background-color: var(--bg-surface, #ffffff);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  padding: 1.5rem;
+  box-sizing: border-box;
+  animation: modalPop 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  color: var(--text-main);
+  position: relative;
 }
 
 @keyframes modalPop {
@@ -810,6 +831,88 @@
   border-radius: 4px;
   border: 1px solid #334155;
   margin-left: auto;
+}
+
+/* Page and Module Container Layouts */
+.module-container,
+.patients-page,
+.users-page,
+.audit-page,
+.reports-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  width: 100%;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.table-container {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background-color: var(--bg-surface, #ffffff);
+  margin-top: 1rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.tab-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.grid-5 {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.75rem;
+}
+
+@media (max-width: 1200px) {
+  .grid-5 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .grid-5 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.toast-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  animation: slideIn 0.2s ease-out;
+}
+
+.command-palette-card {
+  background: var(--bg-surface, #ffffff);
+  border-radius: 12px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+}
+
+.footer-copyright {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 2rem;
 }
 
 /* Comprehensive Laser & Thermal Printer Print Stylesheet */
