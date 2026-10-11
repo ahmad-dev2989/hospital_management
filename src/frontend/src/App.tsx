@@ -43,7 +43,7 @@ import { Settings as SettingsPage } from './pages/Settings';
 import './App.css';
 
 function MainAppShell() {
-  const { user, isAuthenticated, isLoading, isAdmin, hasRole, logout } = useAuth();
+  const { user, isAdmin, hasRole, logout } = useAuth();
   const {
     activeTab,
     setActiveTab,
@@ -100,30 +100,10 @@ function MainAppShell() {
   };
 
   useEffect(() => {
-    if (isAuthenticated) {
-      runDiagnostics();
-      const interval = setInterval(runDiagnostics, 30000);
-      return () => clearInterval(interval);
-    }
-  }, [isAuthenticated]);
-
-  if (isLoading) {
-    return (
-      <div className="login-page">
-        <div style={{ textAlign: 'center', color: '#fff' }}>
-          <Activity size={40} className="spin" color="#0d9488" style={{ margin: '0 auto 1rem auto' }} />
-          <h2 style={{ fontSize: '1.2rem', fontWeight: 600 }}>Mercy Community Hospital</h2>
-          <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginTop: '0.25rem' }}>
-            Initializing offline clinical workstation...
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return <Login />;
-  }
+    runDiagnostics();
+    const interval = setInterval(runDiagnostics, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -664,12 +644,36 @@ function MainAppShell() {
   );
 }
 
+function WorkstationShell() {
+  const { isLoading, isAuthenticated } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="login-page">
+        <div style={{ textAlign: 'center', color: '#fff' }}>
+          <Activity size={40} className="spin" color="#0d9488" style={{ margin: '0 auto 1rem auto' }} />
+          <h2 style={{ fontSize: '1.2rem', fontWeight: 600 }}>Mercy Community Hospital</h2>
+          <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginTop: '0.25rem' }}>
+            Initializing offline clinical workstation...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Login />;
+  }
+
+  return <MainAppShell />;
+}
+
 export default function App() {
   return (
     <AuthProvider>
       <ToastProvider>
         <NavigationProvider>
-          <MainAppShell />
+          <WorkstationShell />
         </NavigationProvider>
       </ToastProvider>
     </AuthProvider>
