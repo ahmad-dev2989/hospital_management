@@ -144,6 +144,43 @@ public class UsersController : ControllerBase
         _dbContext.UserAccounts.Add(user);
         await _dbContext.SaveChangesAsync();
 
+        if (user.Role == UserRole.Doctor)
+        {
+            var defaultDept = await _dbContext.Departments.FirstOrDefaultAsync() 
+                ?? new Department { Id = Guid.NewGuid(), Code = "GEN", Name = "General Medicine", IsActive = true };
+
+            var doc = new Doctor
+            {
+                Id = Guid.NewGuid(),
+                UserId = user.Id,
+                DepartmentId = defaultDept.Id,
+                LicenseNumber = $"DOC-{user.Username.ToUpper()}",
+                Specialization = "General Physician",
+                ConsultationFee = 50.00m,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            _dbContext.Doctors.Add(doc);
+
+            for (int day = 0; day <= 6; day++)
+            {
+                _dbContext.DoctorSchedules.Add(new DoctorSchedule
+                {
+                    Id = Guid.NewGuid(),
+                    DoctorId = doc.Id,
+                    DayOfWeek = day,
+                    StartTime = TimeSpan.FromHours(9),
+                    EndTime = TimeSpan.FromHours(17),
+                    SlotDurationMinutes = 15,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                });
+            }
+            await _dbContext.SaveChangesAsync();
+        }
+
         var actorId = GetCurrentUserId();
         var actorName = User.FindFirstValue(ClaimTypes.Name) ?? "Admin";
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "127.0.0.1";

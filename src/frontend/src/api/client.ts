@@ -489,6 +489,16 @@ class ApiClient {
     return this.request<TimeSlotDto[]>(`/doctors/${doctorId}/slots?date=${encodeURIComponent(date)}`);
   }
 
+  async saveDoctorSchedulesBulk(
+    doctorId: string,
+    data: BulkSaveDoctorScheduleRequest
+  ): Promise<DoctorScheduleDto[]> {
+    return this.request<DoctorScheduleDto[]>(`/doctors/${doctorId}/schedules/bulk`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   async getDepartments(): Promise<DepartmentDto[]> {
     return this.request<DepartmentDto[]>('/doctors/departments');
   }
@@ -1227,6 +1237,19 @@ export interface DoctorScheduleDto {
   endTime: string;
   slotDurationMinutes: number;
   isActive: boolean;
+}
+
+export interface BulkSaveDoctorScheduleRequest {
+  applyToAllDays: boolean;
+  days: {
+    dayOfWeek: number;
+    shifts: {
+      startTime: string;
+      endTime: string;
+      slotDurationMinutes?: number;
+      isActive?: boolean;
+    }[];
+  }[];
 }
 
 export interface DoctorDto {

@@ -76,6 +76,31 @@ public class DoctorsController : ControllerBase
         }
     }
 
+    [HttpPost("{id:guid}/schedules/bulk")]
+    public async Task<IActionResult> SaveDoctorSchedulesBulk(
+        Guid id,
+        [FromBody] BulkSaveDoctorScheduleRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
+        try
+        {
+            var username = User.FindFirstValue(ClaimTypes.Name) ?? User.FindFirstValue("unique_name") ?? "Admin";
+            var result = await _appointmentService.SaveDoctorSchedulesBulkAsync(id, request, username, cancellationToken);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     [HttpGet("departments")]
     public async Task<IActionResult> GetDepartments(CancellationToken cancellationToken)
     {

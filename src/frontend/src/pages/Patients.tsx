@@ -36,6 +36,8 @@ import {
   type DocumentDto,
   type DocumentCategory,
   DOCUMENT_CATEGORY_NAMES,
+  type DoctorDto,
+  type TimeSlotDto,
   type ApiError
 } from '../api/client';
 import { useNavigation } from '../context/NavigationContext';
@@ -112,6 +114,29 @@ export const Patients: React.FC = () => {
     bypassDuplicateWarning: false,
   });
 
+  // Registration Appointment Scheduling State
+  const [doctors, setDoctors] = useState<DoctorDto[]>([]);
+  const [regDoctorId, setRegDoctorId] = useState('');
+  const [regDate, setRegDate] = useState(new Date().toISOString().split('T')[0]);
+  const [regSlots, setRegSlots] = useState<TimeSlotDto[]>([]);
+  const [regSelectedSlot, setRegSelectedSlot] = useState<TimeSlotDto | null>(null);
+  const [regSlotsLoading, setRegSlotsLoading] = useState(false);
+  const [regReason] = useState('Initial Registration & Consultation');
+
+  // Single candidate doctor logic:
+  // If only 1 doctor other than admin exists, or only 1 doctor total exists, auto-select and hide selection
+  const nonAdminDoctors = doctors.filter(
+    (d) =>
+      !d.fullName.toLowerCase().includes('admin') &&
+      !d.specialization.toLowerCase().includes('chief medical officer')
+  );
+  const singleCandidateDoctor =
+    nonAdminDoctors.length === 1
+      ? nonAdminDoctors[0]
+      : nonAdminDoctors.length === 0 && doctors.length === 1
+      ? doctors[0]
+      : null;
+
   const [editForm, setEditForm] = useState<UpdatePatientRequest>({
     firstName: '',
     lastName: '',
@@ -175,6 +200,48 @@ export const Patients: React.FC = () => {
       }
     }
   }, [workflowAction, activePatient]);
+
+  // Initial loading of doctors
+  useEffect(() => {
+    const loadDoctors = async () => {
+      try {
+        const docs = await api.getDoctors();
+        setDoctors(docs);
+      } catch (err) {
+        console.error('Failed to load doctors in Patients module:', err);
+      }
+    };
+    loadDoctors();
+  }, []);
+
+  // Synchronize candidate doctor
+  useEffect(() => {
+    if (singleCandidateDoctor) {
+      setRegDoctorId(singleCandidateDoctor.id);
+    } else if (doctors.length > 0 && !regDoctorId) {
+      setRegDoctorId(doctors[0].id);
+    }
+  }, [doctors, singleCandidateDoctor]);
+
+  // Load available 15-minute slots when register modal is opened or date/doctor changes
+  useEffect(() => {
+    const loadRegSlots = async () => {
+      const activeDocId = singleCandidateDoctor ? singleCandidateDoctor.id : regDoctorId;
+      if (!activeDocId || !regDate || !showRegisterModal) return;
+      setRegSlotsLoading(true);
+      setRegSelectedSlot(null);
+      try {
+        const slots = await api.getDoctorSlots(activeDocId, regDate);
+        setRegSlots(slots);
+      } catch (err) {
+        console.error('Failed to load registration appointment slots:', err);
+        setRegSlots([]);
+      } finally {
+        setRegSlotsLoading(false);
+      }
+    };
+    loadRegSlots();
+  }, [regDoctorId, regDate, showRegisterModal, singleCandidateDoctor]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -289,7 +356,28 @@ export const Patients: React.FC = () => {
       const created = await api.createPatient(payload);
       setShowRegisterModal(false);
       setShowDuplicateWarning(false);
+
+      const targetDocId = singleCandidateDoctor ? singleCandidateDoctor.id : regDoctorId;
+      if (regSelectedSlot && targetDocId) {
+        try {
+          await api.bookAppointment({
+            patientId: created.id,
+            doctorId: targetDocId,
+            startsAt: regSelectedSlot.startsAt,
+            endsAt: regSelectedSlot.endsAt,
+            reason: regReason.trim() || 'Initial Registration Consultation',
+          });
+          toast.success(`Patient registered & appointment booked for ${regSelectedSlot.timeDisplay}!`);
+        } catch (apptErr: any) {
+          console.warn('Could not auto-book appointment on registration:', apptErr);
+          toast.warning(`Patient registered (${created.patientNumber}), but appointment slot could not be booked: ${apptErr.message || 'Slot occupied'}`);
+        }
+      } else {
+        toast.success(`Patient ${created.fullName} (${created.patientNumber}) registered successfully.`);
+      }
+
       setToastMessage(`Patient ${created.fullName} (${created.patientNumber}) registered successfully.`);
+      setRegSelectedSlot(null);
       fetchPatients();
       handleOpenChart(created);
     } catch (err: any) {
@@ -877,6 +965,134 @@ export const Patients: React.FC = () => {
                     value={registerForm.emergencyContactPhone || ''}
                     onChange={(e) => setRegisterForm({ ...registerForm, emergencyContactPhone: e.target.value })}
                   />
+                </div>
+              </div>
+
+              {/* Initial Appointment Booking (Date & 15-Minute Time Slot) */}
+              <div style={{ marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Calendar size={18} color="#0d9488" />
+                    <span style={{ fontWeight: 600, fontSize: '0.925rem', color: '#0f172a' }}>Initial Appointment (Date & Time Slot)</span>
+                  </div>
+                  {regSelectedSlot ? (
+                    <span style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 600, backgroundColor: '#f0fdf4', padding: '0.2rem 0.5rem', borderRadius: '4px', border: '1px solid #bbf7d0' }}>
+                      Selected: {regSelectedSlot.timeDisplay}
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      Optional: select a slot to auto-schedule
+                    </span>
+                  )}
+                </div>
+
+                <div className="form-row-2">
+                  <div className="form-group">
+                    <label className="form-label">Appointment Target Date</label>
+                    <input
+                      type="date"
+                      className="form-input"
+                      value={regDate}
+                      onChange={(e) => setRegDate(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Attending Doctor</label>
+                    {singleCandidateDoctor ? (
+                      <div style={{ padding: '0.5rem 0.75rem', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px' }}>
+                        <div style={{ fontWeight: 600, color: '#15803d', fontSize: '0.85rem' }}>
+                          {singleCandidateDoctor.fullName}
+                        </div>
+                        <div style={{ fontSize: '0.725rem', color: '#16a34a' }}>
+                          {singleCandidateDoctor.specialization}
+                        </div>
+                      </div>
+                    ) : (
+                      <select
+                        className="form-input"
+                        value={regDoctorId}
+                        onChange={(e) => setRegDoctorId(e.target.value)}
+                      >
+                        {doctors.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.fullName} ({d.specialization})
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                </div>
+
+                {/* Visual 15-Minute Slot Picker */}
+                <div style={{ marginTop: '0.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#334155' }}>
+                      Available 15-Minute Time Slots
+                    </span>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                      {regSlots.filter((s) => s.isAvailable).length} slots open
+                    </span>
+                  </div>
+
+                  {regSlotsLoading ? (
+                    <div style={{ textAlign: 'center', padding: '1rem', color: '#64748b', fontSize: '0.8rem' }}>
+                      <RefreshCw size={16} className="spin" style={{ margin: '0 auto 0.25rem auto' }} />
+                      Loading 15-minute slots...
+                    </div>
+                  ) : regSlots.length === 0 ? (
+                    <div style={{ padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '6px', textAlign: 'center', color: '#64748b', fontSize: '0.8rem', border: '1px dashed #cbd5e1' }}>
+                      No open slots for this physician on {regDate}. You can configure shifts in the Appointments tab.
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(4, 1fr)',
+                        gap: '0.4rem',
+                        maxHeight: '140px',
+                        overflowY: 'auto',
+                        padding: '0.35rem',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '6px',
+                        backgroundColor: '#fafafa',
+                      }}
+                    >
+                      {regSlots.map((s, idx) => {
+                        const isSelected = regSelectedSlot?.startsAt === s.startsAt;
+                        return (
+                          <button
+                            key={idx}
+                            type="button"
+                            disabled={!s.isAvailable}
+                            onClick={() => setRegSelectedSlot(isSelected ? null : s)}
+                            style={{
+                              padding: '0.35rem 0.2rem',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              borderRadius: '4px',
+                              border: isSelected
+                                ? '2px solid #0d9488'
+                                : s.isAvailable
+                                ? '1px solid #bbf7d0'
+                                : '1px solid #e2e8f0',
+                              backgroundColor: isSelected
+                                ? '#0d9488'
+                                : s.isAvailable
+                                ? '#f0fdf4'
+                                : '#f1f5f9',
+                              color: isSelected ? '#fff' : s.isAvailable ? '#166534' : '#94a3b8',
+                              cursor: s.isAvailable ? 'pointer' : 'not-allowed',
+                              transition: 'all 0.15s ease',
+                            }}
+                            title={s.isAvailable ? 'Click to select slot' : 'Occupied'}
+                          >
+                            {s.timeDisplay}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
 

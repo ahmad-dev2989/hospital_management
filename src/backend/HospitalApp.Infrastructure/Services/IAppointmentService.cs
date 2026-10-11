@@ -69,5 +69,11 @@ public interface IAppointmentService
         string? currentUserName = null,
         CancellationToken cancellationToken = default);
 
+    Task<List<DoctorScheduleDto>> SaveDoctorSchedulesBulkAsync(
+        Guid doctorId,
+        BulkSaveDoctorScheduleRequest request,
+        string? currentUserName = null,
+        CancellationToken cancellationToken = default);
+
     Task<List<Department>> GetDepartmentsAsync(CancellationToken cancellationToken = default);
 }

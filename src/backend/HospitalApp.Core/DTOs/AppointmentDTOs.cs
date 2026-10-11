@@ -50,6 +50,29 @@ public class SaveDoctorScheduleRequest
     public bool IsActive { get; set; } = true;
 }
 
+public class BulkSaveDoctorScheduleRequest
+{
+    public bool ApplyToAllDays { get; set; } = false;
+    public List<DayScheduleConfig> Days { get; set; } = new();
+}
+
+public class DayScheduleConfig
+{
+    [Range(0, 6)]
+    public int DayOfWeek { get; set; }
+    public List<ScheduleShiftConfig> Shifts { get; set; } = new();
+}
+
+public class ScheduleShiftConfig
+{
+    [Required]
+    public string StartTime { get; set; } = "09:00";
+    [Required]
+    public string EndTime { get; set; } = "17:00";
+    public int SlotDurationMinutes { get; set; } = 15;
+    public bool IsActive { get; set; } = true;
+}
+
 public class TimeSlotDto
 {
     public DateTime StartsAt { get; set; }

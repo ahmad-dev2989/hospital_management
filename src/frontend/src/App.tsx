@@ -29,6 +29,7 @@ import { ToastProvider } from './context/ToastContext';
 import { NavigationProvider, useNavigation } from './context/NavigationContext';
 import { CommandPalette } from './components/CommandPalette';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { SplashScreen } from './components/SplashScreen';
 import { Login } from './pages/Login';
 import { UserManagement } from './pages/UserManagement';
 import { AuditLogs } from './pages/AuditLogs';
@@ -646,19 +647,10 @@ function MainAppShell() {
 
 function WorkstationShell() {
   const { isLoading, isAuthenticated } = useAuth();
+  const [isSplashDone, setIsSplashDone] = useState(false);
 
-  if (isLoading) {
-    return (
-      <div className="login-page">
-        <div style={{ textAlign: 'center', color: '#fff' }}>
-          <Activity size={40} className="spin" color="#0d9488" style={{ margin: '0 auto 1rem auto' }} />
-          <h2 style={{ fontSize: '1.2rem', fontWeight: 600 }}>Mercy Community Hospital</h2>
-          <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginTop: '0.25rem' }}>
-            Initializing offline clinical workstation...
-          </p>
-        </div>
-      </div>
-    );
+  if (!isSplashDone || isLoading) {
+    return <SplashScreen onFinish={() => setIsSplashDone(true)} />;
   }
 
   if (!isAuthenticated) {

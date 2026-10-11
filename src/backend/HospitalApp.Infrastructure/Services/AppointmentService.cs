@@ -509,19 +509,16 @@ public class AppointmentService : IAppointmentService
         var dateUtc = DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
         int dayOfWeek = (int)dateUtc.DayOfWeek;
 
-        var schedule = await _context.DoctorSchedules
+        var schedules = await _context.DoctorSchedules
             .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.DoctorId == doctorId && s.DayOfWeek == dayOfWeek && s.IsActive, cancellationToken);
+            .Where(s => s.DoctorId == doctorId && s.DayOfWeek == dayOfWeek && s.IsActive)
+            .OrderBy(s => s.StartTime)
+            .ToListAsync(cancellationToken);
 
-        if (schedule == null)
+        if (!schedules.Any())
         {
             return new List<TimeSlotDto>();
         }
-
-        var dayStart = dateUtc.Add(schedule.StartTime);
-        var dayEnd = dateUtc.Add(schedule.EndTime);
-        var slotMinutes = schedule.SlotDurationMinutes > 0 ? schedule.SlotDurationMinutes : 15;
-        var duration = TimeSpan.FromMinutes(slotMinutes);
 
         var nextDayUtc = dateUtc.AddDays(1);
         var bookedAppointments = await _context.Appointments
@@ -535,26 +532,34 @@ public class AppointmentService : IAppointmentService
             .ToListAsync(cancellationToken);
 
         var slots = new List<TimeSlotDto>();
-        var current = dayStart;
 
-        while (current + duration <= dayEnd)
+        foreach (var schedule in schedules)
         {
-            var slotEnd = current + duration;
-            var appt = bookedAppointments.FirstOrDefault(a => a.StartsAt < slotEnd && a.EndsAt > current);
+            var dayStart = dateUtc.Add(schedule.StartTime);
+            var dayEnd = dateUtc.Add(schedule.EndTime);
+            var slotMinutes = schedule.SlotDurationMinutes > 0 ? schedule.SlotDurationMinutes : 15;
+            var duration = TimeSpan.FromMinutes(slotMinutes);
 
-            slots.Add(new TimeSlotDto
+            var current = dayStart;
+            while (current + duration <= dayEnd)
             {
-                StartsAt = current,
-                EndsAt = slotEnd,
-                TimeDisplay = $"{current:HH:mm} - {slotEnd:HH:mm}",
-                IsAvailable = appt == null,
-                AppointmentId = appt?.Id,
-                AppointmentNumber = appt?.AppointmentNumber,
-                PatientName = appt == null ? null : $"{appt.Patient.FirstName} {appt.Patient.LastName}",
-                Status = appt?.Status
-            });
+                var slotEnd = current + duration;
+                var appt = bookedAppointments.FirstOrDefault(a => a.StartsAt < slotEnd && a.EndsAt > current);
 
-            current += duration;
+                slots.Add(new TimeSlotDto
+                {
+                    StartsAt = current,
+                    EndsAt = slotEnd,
+                    TimeDisplay = $"{current:HH:mm} - {slotEnd:HH:mm}",
+                    IsAvailable = appt == null,
+                    AppointmentId = appt?.Id,
+                    AppointmentNumber = appt?.AppointmentNumber,
+                    PatientName = appt == null ? null : $"{appt.Patient.FirstName} {appt.Patient.LastName}",
+                    Status = appt?.Status
+                });
+
+                current += duration;
+            }
         }
 
         return slots;
@@ -627,6 +632,106 @@ public class AppointmentService : IAppointmentService
             SlotDurationMinutes = existing.SlotDurationMinutes,
             IsActive = existing.IsActive
         };
+    }
+
+    public async Task<List<DoctorScheduleDto>> SaveDoctorSchedulesBulkAsync(
+        Guid doctorId,
+        BulkSaveDoctorScheduleRequest request,
+        string? currentUserName = null,
+        CancellationToken cancellationToken = default)
+    {
+        var doc = await _context.Doctors.FirstOrDefaultAsync(d => d.Id == doctorId, cancellationToken);
+        if (doc == null)
+            throw new KeyNotFoundException($"Doctor with ID {doctorId} not found.");
+
+        if (request.ApplyToAllDays)
+        {
+            var shiftsToApply = request.Days.FirstOrDefault()?.Shifts ?? new List<ScheduleShiftConfig>();
+
+            var existingAll = await _context.DoctorSchedules
+                .Where(s => s.DoctorId == doctorId)
+                .ToListAsync(cancellationToken);
+            _context.DoctorSchedules.RemoveRange(existingAll);
+
+            foreach (var shift in shiftsToApply.Where(s => s.IsActive))
+            {
+                if (TimeSpan.TryParse(shift.StartTime, out var st) && TimeSpan.TryParse(shift.EndTime, out var et) && et > st)
+                {
+                    for (int day = 0; day <= 6; day++)
+                    {
+                        _context.DoctorSchedules.Add(new DoctorSchedule
+                        {
+                            Id = Guid.NewGuid(),
+                            DoctorId = doctorId,
+                            DayOfWeek = day,
+                            StartTime = st,
+                            EndTime = et,
+                            SlotDurationMinutes = shift.SlotDurationMinutes > 0 ? shift.SlotDurationMinutes : 15,
+                            IsActive = true,
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
+                        });
+                    }
+                }
+            }
+        }
+        else
+        {
+            foreach (var dayConfig in request.Days)
+            {
+                var existingDaySchedules = await _context.DoctorSchedules
+                    .Where(s => s.DoctorId == doctorId && s.DayOfWeek == dayConfig.DayOfWeek)
+                    .ToListAsync(cancellationToken);
+                _context.DoctorSchedules.RemoveRange(existingDaySchedules);
+
+                foreach (var shift in dayConfig.Shifts.Where(s => s.IsActive))
+                {
+                    if (TimeSpan.TryParse(shift.StartTime, out var st) && TimeSpan.TryParse(shift.EndTime, out var et) && et > st)
+                    {
+                        _context.DoctorSchedules.Add(new DoctorSchedule
+                        {
+                            Id = Guid.NewGuid(),
+                            DoctorId = doctorId,
+                            DayOfWeek = dayConfig.DayOfWeek,
+                            StartTime = st,
+                            EndTime = et,
+                            SlotDurationMinutes = shift.SlotDurationMinutes > 0 ? shift.SlotDurationMinutes : 15,
+                            IsActive = true,
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
+                        });
+                    }
+                }
+            }
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        await _auditService.LogAsync(
+            null,
+            currentUserName ?? "System",
+            "DoctorSchedule.BulkSaved",
+            "DoctorSchedule",
+            doctorId.ToString(),
+            $"Updated doctor availability schedule (ApplyToAllDays: {request.ApplyToAllDays})",
+            "127.0.0.1");
+
+        var updated = await _context.DoctorSchedules
+            .Where(s => s.DoctorId == doctorId)
+            .OrderBy(s => s.DayOfWeek).ThenBy(s => s.StartTime)
+            .ToListAsync(cancellationToken);
+
+        return updated.Select(s => new DoctorScheduleDto
+        {
+            Id = s.Id,
+            DoctorId = s.DoctorId,
+            DayOfWeek = s.DayOfWeek,
+            DayName = ((DayOfWeek)s.DayOfWeek).ToString(),
+            StartTime = s.StartTime.ToString(@"hh\:mm"),
+            EndTime = s.EndTime.ToString(@"hh\:mm"),
+            SlotDurationMinutes = s.SlotDurationMinutes,
+            IsActive = s.IsActive
+        }).ToList();
     }
 
     public async Task<List<Department>> GetDepartmentsAsync(CancellationToken cancellationToken = default)

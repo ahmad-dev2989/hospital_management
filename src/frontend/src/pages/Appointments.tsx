@@ -11,7 +11,8 @@ import {
   Plus,
   RefreshCw,
   AlertTriangle,
-  FileText
+  FileText,
+  Sparkles
 } from 'lucide-react';
 import {
   api,
@@ -67,6 +68,61 @@ export const Appointments: React.FC = () => {
   const [bookReason, setBookReason] = useState('');
   const [slotsLoading, setSlotsLoading] = useState(false);
 
+  // Single Doctor Candidate Detection:
+  // If only 1 doctor other than admin exists, or only 1 doctor total exists, auto-select and hide selection
+  const nonAdminDoctors = doctors.filter(
+    (d) =>
+      !d.fullName.toLowerCase().includes('admin') &&
+      !d.specialization.toLowerCase().includes('chief medical officer')
+  );
+  const singleCandidateDoctor =
+    nonAdminDoctors.length === 1
+      ? nonAdminDoctors[0]
+      : nonAdminDoctors.length === 0 && doctors.length === 1
+      ? doctors[0]
+      : null;
+
+  // Doctor Shifts & Slots Management Modal State
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [scheduleDoctorId, setScheduleDoctorId] = useState('');
+  const [scheduleApplyToAllDays, setScheduleApplyToAllDays] = useState(true);
+  const [allDaysShifts, setAllDaysShifts] = useState<Array<{ startTime: string; endTime: string }>>([
+    { startTime: '13:00', endTime: '17:00' }, // 1 PM - 5 PM
+  ]);
+  const [dayCustomShifts, setDayCustomShifts] = useState<Record<number, Array<{ startTime: string; endTime: string }>>>({
+    1: [{ startTime: '13:00', endTime: '19:00' }], // Mon (1-7 PM)
+    2: [{ startTime: '13:00', endTime: '19:00' }], // Tue
+    3: [{ startTime: '13:00', endTime: '19:00' }], // Wed
+    4: [{ startTime: '13:00', endTime: '19:00' }], // Thu
+    5: [{ startTime: '13:00', endTime: '19:00' }], // Fri
+    6: [{ startTime: '13:00', endTime: '19:00' }], // Sat
+    0: [{ startTime: '10:00', endTime: '15:00' }], // Sun (10-3 PM)
+  });
+  const [activeDayTab, setActiveDayTab] = useState<number>(1); // Monday default
+  const [scheduleSaving, setScheduleSaving] = useState(false);
+
+  // Helper to calculate preview 15-min slots for a start and end time
+  const getPreviewSlots = (startTime: string, endTime: string, stepMinutes = 15): string[] => {
+    if (!startTime || !endTime) return [];
+    const [sH, sM] = startTime.split(':').map(Number);
+    const [eH, eM] = endTime.split(':').map(Number);
+    if (isNaN(sH) || isNaN(eH)) return [];
+    const startTotal = sH * 60 + sM;
+    const endTotal = eH * 60 + eM;
+    if (endTotal <= startTotal) return [];
+
+    const slots: string[] = [];
+    for (let t = startTotal; t + stepMinutes <= endTotal; t += stepMinutes) {
+      const hours = Math.floor(t / 60);
+      const mins = t % 60;
+      const period = hours >= 12 ? 'PM' : 'AM';
+      const displayH = hours % 12 === 0 ? 12 : hours % 12;
+      const displayM = mins.toString().padStart(2, '0');
+      slots.push(`${displayH}:${displayM} ${period}`);
+    }
+    return slots;
+  };
+
   // Reschedule form state
   const [rescheduleDate, setRescheduleDate] = useState(new Date().toISOString().split('T')[0]);
   const [rescheduleSlots, setRescheduleSlots] = useState<TimeSlotDto[]>([]);
@@ -105,6 +161,18 @@ export const Appointments: React.FC = () => {
     loadLookups();
   }, []);
 
+  // Synchronize singleCandidateDoctor when doctors load
+  useEffect(() => {
+    if (singleCandidateDoctor) {
+      setBookDoctorId(singleCandidateDoctor.id);
+      setScheduleDoctorId(singleCandidateDoctor.id);
+      setSelectedDoctorId(singleCandidateDoctor.id);
+    } else if (doctors.length > 0 && !bookDoctorId) {
+      setBookDoctorId(doctors[0].id);
+      setScheduleDoctorId(doctors[0].id);
+    }
+  }, [doctors, singleCandidateDoctor]);
+
   // Phase 12: Cross-module workflow actions
   useEffect(() => {
     if (workflowAction) {
@@ -123,6 +191,9 @@ export const Appointments: React.FC = () => {
     if (activePatient && !selectedPatient) {
       setSelectedPatient(activePatient);
       setPatientSearch(`${activePatient.fullName} (${activePatient.patientNumber})`);
+    }
+    if (singleCandidateDoctor) {
+      setBookDoctorId(singleCandidateDoctor.id);
     }
     setShowBookModal(true);
   };
@@ -257,12 +328,17 @@ export const Appointments: React.FC = () => {
       alert('Please choose an available time slot.');
       return;
     }
+    const effectiveDoctorId = singleCandidateDoctor ? singleCandidateDoctor.id : bookDoctorId;
+    if (!effectiveDoctorId) {
+      alert('Please select an attending doctor.');
+      return;
+    }
 
     setActionLoading(true);
     try {
       const res = await api.bookAppointment({
         patientId: selectedPatient.id,
-        doctorId: bookDoctorId,
+        doctorId: effectiveDoctorId,
         startsAt: selectedSlot.startsAt,
         endsAt: selectedSlot.endsAt,
         reason: bookReason.trim() || undefined,
@@ -280,6 +356,69 @@ export const Appointments: React.FC = () => {
       alert(apiErr.message || 'Failed to book appointment.');
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleSaveDoctorSchedules = async () => {
+    const targetDocId = scheduleDoctorId || (singleCandidateDoctor ? singleCandidateDoctor.id : bookDoctorId || doctors[0]?.id);
+    if (!targetDocId) {
+      alert('Please select a doctor to configure shifts for.');
+      return;
+    }
+
+    setScheduleSaving(true);
+    try {
+      if (scheduleApplyToAllDays) {
+        if (allDaysShifts.length === 0) {
+          alert('Please add at least one shift window.');
+          setScheduleSaving(false);
+          return;
+        }
+        await api.saveDoctorSchedulesBulk(targetDocId, {
+          applyToAllDays: true,
+          days: [
+            {
+              dayOfWeek: 1, // applied to all 7 days by backend
+              shifts: allDaysShifts.map((s) => ({
+                startTime: s.startTime,
+                endTime: s.endTime,
+                slotDurationMinutes: 15,
+                isActive: true,
+              })),
+            },
+          ],
+        });
+      } else {
+        await api.saveDoctorSchedulesBulk(targetDocId, {
+          applyToAllDays: false,
+          days: [0, 1, 2, 3, 4, 5, 6].map((dayNum) => ({
+            dayOfWeek: dayNum,
+            shifts: (dayCustomShifts[dayNum] || []).map((s) => ({
+              startTime: s.startTime,
+              endTime: s.endTime,
+              slotDurationMinutes: 15,
+              isActive: true,
+            })),
+          })),
+        });
+      }
+
+      showToast('Doctor shift schedule saved! 15-minute slots created.');
+      setShowScheduleModal(false);
+
+      // Refresh slots immediately for current booking view
+      const activeDocId = singleCandidateDoctor ? singleCandidateDoctor.id : bookDoctorId;
+      if (activeDocId) {
+        setSlotsLoading(true);
+        const slots = await api.getDoctorSlots(activeDocId, bookDate);
+        setAvailableSlots(slots);
+        setSlotsLoading(false);
+      }
+    } catch (err: any) {
+      const apiErr = err as ApiError;
+      alert(apiErr.message || 'Failed to save doctor schedules.');
+    } finally {
+      setScheduleSaving(false);
     }
   };
 
@@ -397,6 +536,18 @@ export const Appointments: React.FC = () => {
             Refresh
           </button>
           <button
+            className="btn btn-outline"
+            onClick={() => {
+              setScheduleDoctorId(singleCandidateDoctor?.id || bookDoctorId || (doctors[0]?.id || ''));
+              setShowScheduleModal(true);
+            }}
+            style={{ fontSize: '0.825rem', padding: '0.45rem 0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#0d9488', borderColor: '#99f6e4', backgroundColor: '#f0fdfa' }}
+            title="Configure doctor shift windows and auto-generate 15-minute appointment slots"
+          >
+            <Clock size={15} />
+            Doctor Shifts & Slots
+          </button>
+          <button
             className="btn btn-primary"
             onClick={handleOpenBookModal}
             style={{ fontSize: '0.825rem', padding: '0.45rem 0.9rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
@@ -491,19 +642,25 @@ export const Appointments: React.FC = () => {
           {/* Doctor Filter */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>Doctor:</span>
-            <select
-              className="input-field"
-              value={selectedDoctorId}
-              onChange={(e) => setSelectedDoctorId(e.target.value)}
-              style={{ padding: '0.35rem 0.6rem', fontSize: '0.825rem', minWidth: '180px' }}
-            >
-              <option value="">All Physicians</option>
-              {doctors.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.fullName} ({d.specialization})
-                </option>
-              ))}
-            </select>
+            {singleCandidateDoctor ? (
+              <span style={{ fontSize: '0.825rem', fontWeight: 600, color: '#0f766e', backgroundColor: '#f0fdfa', padding: '0.3rem 0.6rem', borderRadius: '4px', border: '1px solid #ccfbf1' }}>
+                {singleCandidateDoctor.fullName}
+              </span>
+            ) : (
+              <select
+                className="input-field"
+                value={selectedDoctorId}
+                onChange={(e) => setSelectedDoctorId(e.target.value)}
+                style={{ padding: '0.35rem 0.6rem', fontSize: '0.825rem', minWidth: '180px' }}
+              >
+                <option value="">All Physicians</option>
+                {doctors.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.fullName} ({d.specialization})
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           {/* Department Filter */}
@@ -873,27 +1030,41 @@ export const Appointments: React.FC = () => {
 
               {/* Step 2: Doctor and Date Selection */}
               <div className="grid-2" style={{ gap: '0.75rem', marginBottom: '1rem' }}>
-                <div>
-                  <label className="form-label" style={{ display: 'block', marginBottom: '0.35rem' }}>
-                    2. Attending Physician *
-                  </label>
-                  <select
-                    className="input-field"
-                    value={bookDoctorId}
-                    onChange={(e) => setBookDoctorId(e.target.value)}
-                    required
-                  >
-                    {doctors.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.fullName} ({d.specialization}) — Fee: ${d.consultationFee.toFixed(2)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {singleCandidateDoctor ? (
+                  <div style={{ padding: '0.6rem 0.85rem', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                    <div style={{ fontSize: '0.725rem', color: '#166534', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.04em' }}>
+                      Attending Physician
+                    </div>
+                    <div style={{ fontWeight: 600, color: '#15803d', fontSize: '0.9rem', marginTop: '2px' }}>
+                      {singleCandidateDoctor.fullName}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#16a34a' }}>
+                      {singleCandidateDoctor.specialization} • Fee: ${singleCandidateDoctor.consultationFee.toFixed(2)}
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="form-label" style={{ display: 'block', marginBottom: '0.35rem' }}>
+                      2. Attending Physician *
+                    </label>
+                    <select
+                      className="input-field"
+                      value={bookDoctorId}
+                      onChange={(e) => setBookDoctorId(e.target.value)}
+                      required
+                    >
+                      {doctors.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.fullName} ({d.specialization}) — Fee: ${d.consultationFee.toFixed(2)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 <div>
                   <label className="form-label" style={{ display: 'block', marginBottom: '0.35rem' }}>
-                    3. Target Date *
+                    Target Date *
                   </label>
                   <input
                     type="date"
@@ -909,7 +1080,7 @@ export const Appointments: React.FC = () => {
               <div style={{ marginBottom: '1rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
                   <label className="form-label" style={{ margin: 0 }}>
-                    4. Select Available Time Slot *
+                    Select Available 15-Minute Slot *
                   </label>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                     {availableSlots.filter((s) => s.isAvailable).length} slots open
@@ -922,9 +1093,21 @@ export const Appointments: React.FC = () => {
                     <span style={{ fontSize: '0.8rem' }}>Checking doctor availability...</span>
                   </div>
                 ) : availableSlots.length === 0 ? (
-                  <div style={{ padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '6px', textAlign: 'center', color: '#64748b', fontSize: '0.825rem' }}>
+                  <div style={{ padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '6px', textAlign: 'center', color: '#64748b', fontSize: '0.825rem', border: '1px dashed #cbd5e1' }}>
                     <AlertCircle size={18} color="#94a3b8" style={{ margin: '0 auto 0.25rem auto' }} />
-                    Physician is not scheduled on duty for this date or all slots are occupied.
+                    <p style={{ margin: '0.2rem 0' }}>Physician is not scheduled on duty for this date or all slots are occupied.</p>
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={() => {
+                        setScheduleDoctorId(singleCandidateDoctor?.id || bookDoctorId);
+                        setShowScheduleModal(true);
+                      }}
+                      style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem', marginTop: '0.4rem', color: '#0d9488', borderColor: '#99f6e4', backgroundColor: '#fff' }}
+                    >
+                      <Clock size={13} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
+                      Add / Customize Shifts & Slots (e.g. 1-5 PM)
+                    </button>
                   </div>
                 ) : (
                   <div
@@ -1195,6 +1378,425 @@ export const Appointments: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: DOCTOR SHIFTS & 15-MINUTE SLOTS MANAGER */}
+      {showScheduleModal && (
+        <div className="modal-backdrop">
+          <div className="modal-content card" style={{ maxWidth: '680px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <Clock size={20} color="#0d9488" />
+                <h3 style={{ margin: 0, fontSize: '1.15rem' }}>Doctor Shifts & 15-Minute Slot Manager</h3>
+              </div>
+              <button className="modal-close" onClick={() => setShowScheduleModal(false)}>×</button>
+            </div>
+
+            <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)', margin: '0.35rem 0 1rem 0' }}>
+              Set daily availability windows (e.g. 1 PM – 5 PM, or multi-shifts like 1–3 PM & 5–9 PM). The system automatically divides each window into 15-minute appointment slots.
+            </p>
+
+            {/* Doctor Picker */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label className="form-label" style={{ display: 'block', marginBottom: '0.35rem' }}>
+                Doctor *
+              </label>
+              {singleCandidateDoctor ? (
+                <div style={{ padding: '0.6rem 0.85rem', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px' }}>
+                  <strong style={{ color: '#166534', fontSize: '0.9rem' }}>{singleCandidateDoctor.fullName}</strong>
+                  <span style={{ fontSize: '0.75rem', color: '#15803d', marginLeft: '0.5rem' }}>
+                    ({singleCandidateDoctor.specialization} • Fee: ${singleCandidateDoctor.consultationFee.toFixed(2)})
+                  </span>
+                </div>
+              ) : (
+                <select
+                  className="input-field"
+                  value={scheduleDoctorId}
+                  onChange={(e) => setScheduleDoctorId(e.target.value)}
+                >
+                  {doctors.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.fullName} ({d.specialization})
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {/* Scope Toggle: All Days (Mon-Sun) vs Specific Days */}
+            <div style={{ marginBottom: '1.25rem', padding: '0.85rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+              <label className="form-label" style={{ display: 'block', marginBottom: '0.5rem' }}>
+                Schedule Application Scope
+              </label>
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.85rem', cursor: 'pointer', fontWeight: scheduleApplyToAllDays ? 600 : 400, color: scheduleApplyToAllDays ? '#0d9488' : '#334155' }}>
+                  <input
+                    type="radio"
+                    name="scheduleScope"
+                    checked={scheduleApplyToAllDays}
+                    onChange={() => setScheduleApplyToAllDays(true)}
+                  />
+                  Apply to All Days (Monday – Sunday)
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.85rem', cursor: 'pointer', fontWeight: !scheduleApplyToAllDays ? 600 : 400, color: !scheduleApplyToAllDays ? '#0d9488' : '#334155' }}>
+                  <input
+                    type="radio"
+                    name="scheduleScope"
+                    checked={!scheduleApplyToAllDays}
+                    onChange={() => setScheduleApplyToAllDays(false)}
+                  />
+                  Customize Specific Days (e.g. Mon–Sat 1–7 PM, Sun 10–3 PM)
+                </label>
+              </div>
+            </div>
+
+            {/* Quick Presets Bar */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.45rem' }}>
+                <Sparkles size={14} color="#0d9488" />
+                <span style={{ fontSize: '0.785rem', fontWeight: 600, color: '#475569' }}>Quick Presets:</span>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => {
+                    const preset = [{ startTime: '13:00', endTime: '17:00' }];
+                    if (scheduleApplyToAllDays) {
+                      setAllDaysShifts(preset);
+                    } else {
+                      setDayCustomShifts({ ...dayCustomShifts, [activeDayTab]: preset });
+                    }
+                  }}
+                  style={{ fontSize: '0.75rem', padding: '0.25rem 0.55rem' }}
+                >
+                  1 PM – 5 PM (13:00 – 17:00)
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => {
+                    const preset = [
+                      { startTime: '13:00', endTime: '15:00' },
+                      { startTime: '17:00', endTime: '21:00' },
+                    ];
+                    if (scheduleApplyToAllDays) {
+                      setAllDaysShifts(preset);
+                    } else {
+                      setDayCustomShifts({ ...dayCustomShifts, [activeDayTab]: preset });
+                    }
+                  }}
+                  style={{ fontSize: '0.75rem', padding: '0.25rem 0.55rem' }}
+                >
+                  1–3 PM & 5–9 PM (Multi-Shift)
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => {
+                    const preset = [{ startTime: '13:00', endTime: '19:00' }];
+                    if (scheduleApplyToAllDays) {
+                      setAllDaysShifts(preset);
+                    } else {
+                      setDayCustomShifts({ ...dayCustomShifts, [activeDayTab]: preset });
+                    }
+                  }}
+                  style={{ fontSize: '0.75rem', padding: '0.25rem 0.55rem' }}
+                >
+                  1 PM – 7 PM (13:00 – 19:00)
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => {
+                    const preset = [{ startTime: '10:00', endTime: '15:00' }];
+                    if (scheduleApplyToAllDays) {
+                      setAllDaysShifts(preset);
+                    } else {
+                      setDayCustomShifts({ ...dayCustomShifts, [activeDayTab]: preset });
+                    }
+                  }}
+                  style={{ fontSize: '0.75rem', padding: '0.25rem 0.55rem' }}
+                >
+                  10 AM – 3 PM (Sunday Standard)
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => {
+                    const preset = [{ startTime: '09:00', endTime: '17:00' }];
+                    if (scheduleApplyToAllDays) {
+                      setAllDaysShifts(preset);
+                    } else {
+                      setDayCustomShifts({ ...dayCustomShifts, [activeDayTab]: preset });
+                    }
+                  }}
+                  style={{ fontSize: '0.75rem', padding: '0.25rem 0.55rem' }}
+                >
+                  9 AM – 5 PM (09:00 – 17:00)
+                </button>
+              </div>
+            </div>
+
+            {/* Custom Days Tab Header (if Customize by Day mode) */}
+            {!scheduleApplyToAllDays && (
+              <div style={{ marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', gap: '0.35rem', overflowX: 'auto', paddingBottom: '0.25rem' }}>
+                  {[
+                    { day: 1, label: 'Mon' },
+                    { day: 2, label: 'Tue' },
+                    { day: 3, label: 'Wed' },
+                    { day: 4, label: 'Thu' },
+                    { day: 5, label: 'Fri' },
+                    { day: 6, label: 'Sat' },
+                    { day: 0, label: 'Sun' },
+                  ].map(({ day, label }) => {
+                    const isTabActive = activeDayTab === day;
+                    const shiftCount = (dayCustomShifts[day] || []).length;
+                    return (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() => setActiveDayTab(day)}
+                        className={`btn ${isTabActive ? 'btn-primary' : 'btn-outline'}`}
+                        style={{ fontSize: '0.775rem', padding: '0.35rem 0.65rem', flexShrink: 0 }}
+                      >
+                        {label} ({shiftCount})
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => {
+                      const monShifts = dayCustomShifts[1] || [{ startTime: '13:00', endTime: '19:00' }];
+                      setDayCustomShifts({
+                        ...dayCustomShifts,
+                        1: [...monShifts],
+                        2: [...monShifts],
+                        3: [...monShifts],
+                        4: [...monShifts],
+                        5: [...monShifts],
+                        6: [...monShifts],
+                      });
+                      toast.info('Applied Monday shifts to Tuesday – Saturday.');
+                    }}
+                    style={{ fontSize: '0.725rem', padding: '0.2rem 0.5rem' }}
+                  >
+                    Copy Mon Shifts to Mon–Sat
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => {
+                      setDayCustomShifts({
+                        ...dayCustomShifts,
+                        0: [{ startTime: '10:00', endTime: '15:00' }],
+                      });
+                      toast.info('Sunday set to 10 AM – 3 PM.');
+                    }}
+                    style={{ fontSize: '0.725rem', padding: '0.2rem 0.5rem' }}
+                  >
+                    Set Sunday to 10 AM – 3 PM
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Current Active Shifts Windows Editor */}
+            {(() => {
+              const currentShifts = scheduleApplyToAllDays
+                ? allDaysShifts
+                : dayCustomShifts[activeDayTab] || [];
+
+              const updateShift = (idx: number, field: 'startTime' | 'endTime', val: string) => {
+                if (scheduleApplyToAllDays) {
+                  const copy = [...allDaysShifts];
+                  copy[idx] = { ...copy[idx], [field]: val };
+                  setAllDaysShifts(copy);
+                } else {
+                  const copy = [...(dayCustomShifts[activeDayTab] || [])];
+                  copy[idx] = { ...copy[idx], [field]: val };
+                  setDayCustomShifts({ ...dayCustomShifts, [activeDayTab]: copy });
+                }
+              };
+
+              const removeShift = (idx: number) => {
+                if (scheduleApplyToAllDays) {
+                  setAllDaysShifts(allDaysShifts.filter((_, i) => i !== idx));
+                } else {
+                  const filtered = (dayCustomShifts[activeDayTab] || []).filter((_, i) => i !== idx);
+                  setDayCustomShifts({ ...dayCustomShifts, [activeDayTab]: filtered });
+                }
+              };
+
+              const addShift = () => {
+                const newShift = { startTime: '17:00', endTime: '21:00' };
+                if (scheduleApplyToAllDays) {
+                  setAllDaysShifts([...allDaysShifts, newShift]);
+                } else {
+                  const copy = [...(dayCustomShifts[activeDayTab] || []), newShift];
+                  setDayCustomShifts({ ...dayCustomShifts, [activeDayTab]: copy });
+                }
+              };
+
+              const allPreviewSlots = currentShifts.flatMap((s) => getPreviewSlots(s.startTime, s.endTime, 15));
+
+              return (
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1rem', marginBottom: '1rem', backgroundColor: '#fff' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                    <strong style={{ fontSize: '0.875rem', color: '#0f172a' }}>
+                      {scheduleApplyToAllDays
+                        ? 'All Days (Mon – Sun) Shift Windows'
+                        : `${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][activeDayTab]} Shift Windows`}
+                    </strong>
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={addShift}
+                      style={{ fontSize: '0.75rem', padding: '0.25rem 0.55rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                    >
+                      <Plus size={13} />
+                      Add Shift Window
+                    </button>
+                  </div>
+
+                  {currentShifts.length === 0 ? (
+                    <div style={{ padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '6px', textAlign: 'center', color: '#64748b', fontSize: '0.8rem' }}>
+                      No shifts configured. Click "Add Shift Window" or choose a Quick Preset above.
+                    </div>
+                  ) : (
+                    currentShifts.map((shift, sIdx) => {
+                      const shiftSlots = getPreviewSlots(shift.startTime, shift.endTime, 15);
+                      return (
+                        <div
+                          key={sIdx}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.75rem',
+                            marginBottom: '0.75rem',
+                            padding: '0.65rem 0.85rem',
+                            backgroundColor: '#f8fafc',
+                            borderRadius: '6px',
+                            border: '1px solid #e2e8f0',
+                          }}
+                        >
+                          <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', minWidth: '45px' }}>
+                            Shift {sIdx + 1}
+                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>From:</span>
+                            <input
+                              type="time"
+                              className="input-field"
+                              value={shift.startTime}
+                              onChange={(e) => updateShift(sIdx, 'startTime', e.target.value)}
+                              style={{ padding: '0.3rem 0.5rem', fontSize: '0.8rem', width: '110px' }}
+                              required
+                            />
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>To:</span>
+                            <input
+                              type="time"
+                              className="input-field"
+                              value={shift.endTime}
+                              onChange={(e) => updateShift(sIdx, 'endTime', e.target.value)}
+                              style={{ padding: '0.3rem 0.5rem', fontSize: '0.8rem', width: '110px' }}
+                              required
+                            />
+                          </div>
+                          <span style={{ fontSize: '0.75rem', color: '#0d9488', fontWeight: 600, marginLeft: 'auto' }}>
+                            {shiftSlots.length} slots (15 min each)
+                          </span>
+                          <button
+                            type="button"
+                            className="btn btn-outline"
+                            onClick={() => removeShift(sIdx)}
+                            style={{ fontSize: '0.75rem', padding: '0.25rem 0.45rem', color: '#dc2626', borderColor: '#fca5a5' }}
+                            title="Remove this shift window"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      );
+                    })
+                  )}
+
+                  {/* Visual 15-Minute Generated Slots Preview */}
+                  {allPreviewSlots.length > 0 && (
+                    <div style={{ marginTop: '0.85rem', paddingTop: '0.85rem', borderTop: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#334155' }}>
+                          Auto-Generated 15-Minute Slots Preview ({allPreviewSlots.length} slots total):
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: '0.35rem',
+                          maxHeight: '110px',
+                          overflowY: 'auto',
+                          padding: '0.4rem',
+                          backgroundColor: '#f0fdf4',
+                          border: '1px solid #bbf7d0',
+                          borderRadius: '6px',
+                        }}
+                      >
+                        {allPreviewSlots.map((timeStr, tIdx) => (
+                          <span
+                            key={tIdx}
+                            style={{
+                              fontSize: '0.725rem',
+                              fontWeight: 600,
+                              color: '#166534',
+                              backgroundColor: '#ffffff',
+                              padding: '0.2rem 0.45rem',
+                              borderRadius: '4px',
+                              border: '1px solid #86efac',
+                            }}
+                          >
+                            {timeStr}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* Modal Actions */}
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => setShowScheduleModal(false)}
+                disabled={scheduleSaving}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleSaveDoctorSchedules}
+                disabled={scheduleSaving}
+              >
+                {scheduleSaving ? (
+                  <span className="btn-loading">
+                    <RefreshCw size={14} className="spin" /> Saving Shifts...
+                  </span>
+                ) : (
+                  'Save Doctor Shifts & 15-Minute Slots'
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
