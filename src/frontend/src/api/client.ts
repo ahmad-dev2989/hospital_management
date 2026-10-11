@@ -1053,6 +1053,115 @@ class ApiClient {
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
   }
+
+  // Module I (Documents & Local Storage) Methods
+  async getDocuments(params?: {
+    patientId?: string;
+    encounterId?: string;
+    category?: number;
+    query?: string;
+    page?: number;
+    pageSize?: number;
+  }): Promise<PagedResult<DocumentDto>> {
+    const searchParams = new URLSearchParams();
+    if (params?.patientId) searchParams.append('patientId', params.patientId);
+    if (params?.encounterId) searchParams.append('encounterId', params.encounterId);
+    if (params?.category !== undefined) searchParams.append('category', params.category.toString());
+    if (params?.query) searchParams.append('query', params.query);
+    if (params?.page) searchParams.append('page', params.page.toString());
+    if (params?.pageSize) searchParams.append('pageSize', params.pageSize.toString());
+
+    const qs = searchParams.toString();
+    return this.request<PagedResult<DocumentDto>>(`/documents${qs ? `?${qs}` : ''}`);
+  }
+
+  async getDocumentById(id: string): Promise<DocumentDto> {
+    return this.request<DocumentDto>(`/documents/${id}`);
+  }
+
+  async uploadDocument(formData: FormData): Promise<DocumentDto> {
+    const headers: Record<string, string> = {};
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
+    }
+    const response = await fetch(`${API_BASE_URL}/documents/upload`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+    if (!response.ok) {
+      let errData: any;
+      try {
+        errData = await response.json();
+      } catch { }
+      throw errData?.error || {
+        code: `HTTP_${response.status}`,
+        message: response.statusText || 'Document upload failed',
+      };
+    }
+    return await response.json();
+  }
+
+  async downloadDocument(id: string, defaultFileName: string): Promise<void> {
+    return this.downloadReportCsv(`/documents/${id}/download`, defaultFileName);
+  }
+
+  async deleteDocument(id: string): Promise<void> {
+    return this.request<void>(`/documents/${id}`, { method: 'DELETE' });
+  }
+
+  // Module J (System Settings & Administration) Methods
+  async getSystemSettings(): Promise<SystemSettingDto[]> {
+    return this.request<SystemSettingDto[]>('/system/settings');
+  }
+
+  async getSystemSettingByKey(key: string): Promise<SystemSettingDto> {
+    return this.request<SystemSettingDto>(`/system/settings/${encodeURIComponent(key)}`);
+  }
+
+  async updateSystemSetting(key: string, value: string, description?: string): Promise<SystemSettingDto> {
+    return this.request<SystemSettingDto>(`/system/settings/${encodeURIComponent(key)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ value, description }),
+    });
+  }
+
+  async batchUpdateSystemSettings(settings: Record<string, string>): Promise<SystemSettingDto[]> {
+    return this.request<SystemSettingDto[]>('/system/settings', {
+      method: 'PUT',
+      body: JSON.stringify({ settings }),
+    });
+  }
+
+  async getDatabaseBackups(): Promise<DatabaseBackupDto[]> {
+    return this.request<DatabaseBackupDto[]>('/system/backups');
+  }
+
+  async createDatabaseBackup(): Promise<DatabaseBackupDto> {
+    return this.request<DatabaseBackupDto>('/system/backups', { method: 'POST' });
+  }
+
+  async verifyDatabaseBackup(fileName: string): Promise<DatabaseBackupDto> {
+    return this.request<DatabaseBackupDto>(`/system/backups/${encodeURIComponent(fileName)}/verify`, {
+      method: 'POST',
+    });
+  }
+
+  async deleteDatabaseBackup(fileName: string): Promise<void> {
+    return this.request<void>(`/system/backups/${encodeURIComponent(fileName)}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getSystemInfo(): Promise<SystemInfoDto> {
+    return this.request<SystemInfoDto>('/system/info');
+  }
+
+  async runDatabaseMaintenance(): Promise<{ message: string; executedAt: string }> {
+    return this.request<{ message: string; executedAt: string }>('/system/maintenance/vacuum', {
+      method: 'POST',
+    });
+  }
 }
 
 // Module C (Appointments & Scheduling) Interfaces
@@ -2029,6 +2138,74 @@ export interface PharmacyValuationReportDto {
   damagedWastageUnits: number;
   damagedWastageCostValue: number;
   expiryAgingSchedule: ExpiryHorizonDto[];
+}
+
+// Module I & J (Documents, Storage & System Settings) Interfaces
+export type DocumentCategory =
+  | 0 // General
+  | 1 // LabReport
+  | 2 // Prescription
+  | 3 // Scan
+  | 4 // Referral
+  | 5; // Identity
+
+export const DOCUMENT_CATEGORY_NAMES: Record<DocumentCategory, string> = {
+  0: 'General Document',
+  1: 'Laboratory Report',
+  2: 'Prescription & Formulary',
+  3: 'Diagnostic Scan / Imaging',
+  4: 'Specialist Referral',
+  5: 'Patient Identity & Insurance',
+};
+
+export interface DocumentDto {
+  id: string;
+  patientId: string;
+  patientNumber: string;
+  patientName: string;
+  encounterId?: string | null;
+  uploadedByUserId: string;
+  uploadedByUserName: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  sha256Hash: string;
+  category: DocumentCategory;
+  categoryName: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SystemSettingDto {
+  key: string;
+  value: string;
+  description: string;
+  updatedAt: string;
+}
+
+export interface DatabaseBackupDto {
+  fileName: string;
+  sizeBytes: number;
+  createdAt: string;
+  sha256Hash: string;
+  isVerified: boolean;
+  statusMessage: string;
+}
+
+export interface SystemInfoDto {
+  dotNetVersion: string;
+  osDescription: string;
+  machineName: string;
+  serverTimeUtc: string;
+  databaseName: string;
+  databaseServerVersion: string;
+  recordCounts: Record<string, number>;
+  documentsStoragePath: string;
+  totalStoredDocumentsCount: number;
+  totalStoredDocumentsSizeBytes: number;
+  backupsDirectoryPath: string;
+  totalBackupsCount: number;
+  freeDiskSpaceBytes: number;
 }
 
 export const api = new ApiClient();

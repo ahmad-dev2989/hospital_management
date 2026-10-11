@@ -46,6 +46,10 @@ public class ApplicationDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
+        // DocumentMetadata maps to DocumentMetadatas table from migration
+        modelBuilder.Entity<DocumentMetadata>()
+            .ToTable("DocumentMetadatas");
+
         // SystemSettings has Key as PK
         modelBuilder.Entity<SystemSetting>()
             .HasKey(s => s.Key);

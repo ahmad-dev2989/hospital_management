@@ -33,6 +33,7 @@ import { Laboratory } from './pages/Laboratory';
 import { Pharmacy } from './pages/Pharmacy';
 import { Billing } from './pages/Billing';
 import { Reports } from './pages/Reports';
+import { Settings as SettingsPage } from './pages/Settings';
 import './App.css';
 
 function MainAppShell() {
@@ -452,7 +453,9 @@ function MainAppShell() {
 
           {activeTab === 'reports' && <Reports />}
 
-          {activeTab !== 'foundation' && activeTab !== 'users' && activeTab !== 'audit' && activeTab !== 'patients' && activeTab !== 'appointments' && activeTab !== 'clinical' && activeTab !== 'laboratory' && activeTab !== 'pharmacy' && activeTab !== 'billing' && activeTab !== 'reports' && (
+          {activeTab === 'settings' && <SettingsPage />}
+
+          {activeTab !== 'foundation' && activeTab !== 'users' && activeTab !== 'audit' && activeTab !== 'patients' && activeTab !== 'appointments' && activeTab !== 'clinical' && activeTab !== 'laboratory' && activeTab !== 'pharmacy' && activeTab !== 'billing' && activeTab !== 'reports' && activeTab !== 'settings' && (
             <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
               <AlertCircle size={40} color="#0d9488" style={{ margin: '0 auto 1rem auto' }} />
               <h2 style={{ fontSize: '1.25rem' }}>{navItems.find((n) => n.id === activeTab)?.label} Module</h2>

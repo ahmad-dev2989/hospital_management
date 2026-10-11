@@ -26,7 +26,7 @@ This implementation plan tracks the lifecycle, phase progress, and module status
 | **Phase 8** | Pharmacy & Inventory | **Tested** | Drug catalog, FEFO batch tracking, expiry monitoring, transaction-safe dispensing, stock movements ledger. |
 | **Phase 9** | Billing & Payments | **Tested** | Service catalog, invoice generation, payment capture, idempotent transactions, receipts, refunds, shift close. |
 | **Phase 10** | Reports & Dashboard | **Tested** | Real-time database metrics, financial reconciliation, clinical turnaround, appointment stats, data export. |
-| **Phase 11** | Local Documents & Backup | **Not started** | Secure local storage, SHA-256 deduplication, automated pg_dump backup schedule, restore verification. |
+| **Phase 11** | Local Documents & Backup | **Tested** | Secure local storage, SHA-256 deduplication, automated pg_dump backup schedule, restore verification. |
 | **Phase 12** | Integration & UX Polish | **Not started** | Cross-module navigation, responsive desktop layouts, error toast handling, keyboard accessibility. |
 | **Phase 13** | Security, Reliability & Performance | **Not started** | Concurrency tests (slot double-booking, stock race conditions), load validation, security audit. |
 | **Phase 14** | Desktop Packaging & Installation | **Not started** | Self-contained Windows desktop package, bundled PostgreSQL runner, zero-dev manual startup. |
@@ -103,16 +103,16 @@ This implementation plan tracks the lifecycle, phase progress, and module status
 - [x] CSV/PDF report export — **Tested**
 
 ### Module I: Documents & Local Storage
-- [x] DocumentMetadata schema with SHA-256 hash & MIME validation — **Implemented**
-- [ ] Dedicated AppData storage directory manager (`%PROGRAMDATA%\HospitalApp\Documents`) — **Not started**
-- [ ] Secure file streaming endpoint with authorization verification — **Not started**
-- [ ] Path traversal prevention and file content validation — **Not started**
+- [x] DocumentMetadata schema with SHA-256 hash & MIME validation — **Tested**
+- [x] Dedicated AppData storage directory manager (`%LOCALAPPDATA%\HospitalApp\Documents`) — **Tested**
+- [x] Secure file streaming endpoint with authorization verification — **Tested**
+- [x] Path traversal prevention and file content validation — **Tested**
 
 ### Module J: System Settings & Administration
-- [x] SystemSetting key-value schema — **Implemented**
-- [ ] Configurable hospital details (name, address, tax ID, currency, logo) — **Not started**
-- [ ] Automated database backup scheduler (local drive + optional external drive) — **Not started**
-- [ ] Database restoration verification tool — **Not started**
+- [x] SystemSetting key-value schema — **Tested**
+- [x] Configurable hospital details (name, address, tax ID, currency, logo) — **Tested**
+- [x] Automated database backup scheduler (local drive + optional external drive) — **Tested**
+- [x] Database restoration verification tool — **Tested**
 
 ---
 
