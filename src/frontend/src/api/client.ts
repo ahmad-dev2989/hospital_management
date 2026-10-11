@@ -745,6 +745,106 @@ class ApiClient {
       body: JSON.stringify({ reason }),
     });
   }
+
+  // Pharmacy & Inventory Management (Module F)
+  async getPharmacyMetrics(): Promise<PharmacyDashboardMetricsDto> {
+    return this.request<PharmacyDashboardMetricsDto>('/pharmacy/metrics');
+  }
+
+  async getExpiringBatches(daysThreshold = 30): Promise<InventoryBatchDto[]> {
+    return this.request<InventoryBatchDto[]>(`/pharmacy/alerts/expiring?daysThreshold=${daysThreshold}`);
+  }
+
+  async getLowStockDrugs(): Promise<PharmacyDrugDto[]> {
+    return this.request<PharmacyDrugDto[]>('/pharmacy/alerts/low-stock');
+  }
+
+  async getPharmacyDrugs(query?: string, activeOnly = true): Promise<PharmacyDrugDto[]> {
+    const params = new URLSearchParams();
+    if (query) params.append('query', query);
+    params.append('activeOnly', activeOnly.toString());
+    const qs = params.toString();
+    return this.request<PharmacyDrugDto[]>(`/pharmacy/drugs${qs ? `?${qs}` : ''}`);
+  }
+
+  async getPharmacyDrugById(id: string): Promise<PharmacyDrugDto> {
+    return this.request<PharmacyDrugDto>(`/pharmacy/drugs/${id}`);
+  }
+
+  async createPharmacyDrug(data: CreateDrugRequest): Promise<PharmacyDrugDto> {
+    return this.request<PharmacyDrugDto>('/pharmacy/drugs', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updatePharmacyDrug(id: string, data: UpdateDrugRequest): Promise<PharmacyDrugDto> {
+    return this.request<PharmacyDrugDto>(`/pharmacy/drugs/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getBatches(drugId?: string, availableOnly = false): Promise<InventoryBatchDto[]> {
+    const params = new URLSearchParams();
+    if (drugId) params.append('drugId', drugId);
+    if (availableOnly) params.append('availableOnly', 'true');
+    const qs = params.toString();
+    return this.request<InventoryBatchDto[]>(`/pharmacy/batches${qs ? `?${qs}` : ''}`);
+  }
+
+  async receiveBatch(data: ReceiveBatchRequest): Promise<InventoryBatchDto> {
+    return this.request<InventoryBatchDto>('/pharmacy/batches/receive', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async adjustStock(data: AdjustStockRequest): Promise<InventoryBatchDto> {
+    return this.request<InventoryBatchDto>('/pharmacy/batches/adjust', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getStockMovements(params?: {
+    batchId?: string;
+    drugId?: string;
+    page?: number;
+    pageSize?: number;
+  }): Promise<PagedResult<StockMovementDto>> {
+    const searchParams = new URLSearchParams();
+    if (params?.batchId) searchParams.append('batchId', params.batchId);
+    if (params?.drugId) searchParams.append('drugId', params.drugId);
+    if (params?.page) searchParams.append('page', params.page.toString());
+    if (params?.pageSize) searchParams.append('pageSize', params.pageSize.toString());
+
+    const qs = searchParams.toString();
+    return this.request<PagedResult<StockMovementDto>>(`/pharmacy/stock-movements${qs ? `?${qs}` : ''}`);
+  }
+
+  async getPrescriptionQueue(params?: {
+    status?: PrescriptionStatus;
+    query?: string;
+  }): Promise<PrescriptionQueueItemDto[]> {
+    const searchParams = new URLSearchParams();
+    if (params?.status !== undefined) searchParams.append('status', params.status.toString());
+    if (params?.query) searchParams.append('query', params.query);
+
+    const qs = searchParams.toString();
+    return this.request<PrescriptionQueueItemDto[]>(`/pharmacy/prescriptions/queue${qs ? `?${qs}` : ''}`);
+  }
+
+  async getPrescriptionDispenseDetails(id: string): Promise<PrescriptionQueueItemDto> {
+    return this.request<PrescriptionQueueItemDto>(`/pharmacy/prescriptions/${id}/dispense-details`);
+  }
+
+  async dispensePrescription(id: string, data: DispensePrescriptionRequest): Promise<DispenseRecordDto> {
+    return this.request<DispenseRecordDto>(`/pharmacy/prescriptions/${id}/dispense`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
 }
 
 // Module C (Appointments & Scheduling) Interfaces
@@ -1215,6 +1315,222 @@ export interface RecordLabResultsRequest {
 export interface VerifyLabResultsRequest {
   releaseImmediately: boolean;
   verificationNotes?: string;
+}
+
+// Module F (Pharmacy & Inventory) Interfaces
+export type PrescriptionStatus =
+  | 0 // Draft
+  | 1 // Signed
+  | 2 // PartiallyDispensed
+  | 3 // Dispensed
+  | 4 // Cancelled
+  | 5; // Expired
+
+export const PRESCRIPTION_STATUS_NAMES: Record<PrescriptionStatus, string> = {
+  0: 'Draft',
+  1: 'Signed',
+  2: 'Partially Dispensed',
+  3: 'Dispensed',
+  4: 'Cancelled',
+  5: 'Expired',
+};
+
+export type InventoryBatchStatus =
+  | 0 // Available
+  | 1 // Quarantined
+  | 2 // Expired
+  | 3 // Recalled
+  | 4; // Depleted
+
+export const INVENTORY_BATCH_STATUS_NAMES: Record<InventoryBatchStatus, string> = {
+  0: 'Available',
+  1: 'Quarantined',
+  2: 'Expired',
+  3: 'Recalled',
+  4: 'Depleted',
+};
+
+export type StockMovementType =
+  | 0 // Initial
+  | 1 // PurchaseReceived
+  | 2 // Dispensed
+  | 3 // ReturnToStock
+  | 4 // AdjustmentIncrease
+  | 5 // AdjustmentDecrease
+  | 6 // ExpiredWastage
+  | 7; // Damaged
+
+export const STOCK_MOVEMENT_TYPE_NAMES: Record<StockMovementType, string> = {
+  0: 'Initial Stock',
+  1: 'Purchase Received',
+  2: 'Dispensed to Patient',
+  3: 'Return to Stock',
+  4: 'Adjustment (+)',
+  5: 'Adjustment (-)',
+  6: 'Expired Wastage',
+  7: 'Damaged Wastage',
+};
+
+export interface PharmacyDrugDto {
+  id: string;
+  code: string;
+  brandName: string;
+  genericName: string;
+  dosageForm: string;
+  strength: string;
+  reorderLevel: number;
+  totalStockOnHand: number;
+  isLowStock: boolean;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  batches: InventoryBatchDto[];
+}
+
+export interface CreateDrugRequest {
+  code: string;
+  brandName: string;
+  genericName: string;
+  dosageForm: string;
+  strength: string;
+  reorderLevel: number;
+}
+
+export interface UpdateDrugRequest {
+  brandName: string;
+  genericName: string;
+  dosageForm: string;
+  strength: string;
+  reorderLevel: number;
+  isActive: boolean;
+}
+
+export interface InventoryBatchDto {
+  id: string;
+  drugId: string;
+  drugCode: string;
+  drugName: string;
+  batchNumber: string;
+  expiryDate: string;
+  quantityReceived: number;
+  quantityOnHand: number;
+  unitCost: number;
+  sellingPrice: number;
+  status: InventoryBatchStatus;
+  isExpired: boolean;
+  daysUntilExpiry: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReceiveBatchRequest {
+  drugId: string;
+  batchNumber: string;
+  expiryDate: string;
+  quantity: number;
+  unitCost: number;
+  sellingPrice: number;
+}
+
+export interface AdjustStockRequest {
+  batchId: string;
+  movementType: StockMovementType;
+  quantityDelta: number;
+  reason: string;
+}
+
+export interface StockMovementDto {
+  id: string;
+  inventoryBatchId: string;
+  batchNumber: string;
+  drugName: string;
+  movementType: StockMovementType;
+  quantityDelta: number;
+  balanceAfter: number;
+  referenceId: string;
+  reason: string;
+  performedByUserId: string;
+  performedByUserName: string;
+  createdAt: string;
+}
+
+export interface PrescriptionQueueItemDrugDto {
+  prescriptionItemId: string;
+  drugId: string;
+  drugCode: string;
+  drugName: string;
+  dosage: string;
+  frequency: string;
+  route: string;
+  durationDays: number;
+  quantityPrescribed: number;
+  quantityDispensed: number;
+  quantityRemaining: number;
+  instructions?: string | null;
+  availableStockOnHand: number;
+  suggestedFefoBatches: InventoryBatchDto[];
+}
+
+export interface PrescriptionQueueItemDto {
+  id: string;
+  prescriptionNumber: string;
+  encounterId: string;
+  patientId: string;
+  patientNumber: string;
+  patientName: string;
+  patientGender: string;
+  patientDateOfBirth: string;
+  patientAllergies: string[];
+  doctorId: string;
+  doctorName: string;
+  signedAt: string;
+  status: PrescriptionStatus;
+  items: PrescriptionQueueItemDrugDto[];
+}
+
+export interface DispenseLineRequest {
+  prescriptionItemId: string;
+  inventoryBatchId?: string;
+  quantityToDispense: number;
+}
+
+export interface DispensePrescriptionRequest {
+  idempotencyKey: string;
+  lines: DispenseLineRequest[];
+}
+
+export interface DispenseItemDto {
+  id: string;
+  prescriptionItemId: string;
+  drugName: string;
+  inventoryBatchId: string;
+  batchNumber: string;
+  quantity: number;
+  unitPriceSnapshot: number;
+  totalPrice: number;
+}
+
+export interface DispenseRecordDto {
+  id: string;
+  prescriptionId: string;
+  prescriptionNumber: string;
+  patientName: string;
+  patientNumber: string;
+  pharmacistUserId: string;
+  pharmacistUserName: string;
+  dispensedAt: string;
+  idempotencyKey: string;
+  totalDispensedPrice: number;
+  items: DispenseItemDto[];
+}
+
+export interface PharmacyDashboardMetricsDto {
+  totalDrugsCount: number;
+  lowStockAlertsCount: number;
+  expiringBatches30DaysCount: number;
+  expiredBatchesCount: number;
+  pendingPrescriptionsCount: number;
+  dispensedTodayCount: number;
 }
 
 export const api = new ApiClient();

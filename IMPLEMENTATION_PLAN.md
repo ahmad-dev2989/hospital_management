@@ -79,12 +79,12 @@ This implementation plan tracks the lifecycle, phase progress, and module status
 - [x] Printable clinical lab result report — **Tested**
 
 ### Module F: Pharmacy & Inventory
-- [x] Drug, InventoryBatch, DispenseRecord, DispenseItem, StockMovement schema — **Implemented**
-- [ ] Drug catalog & formulary management — **Not started**
-- [ ] Inventory batch receiving with FEFO (First-Expired-First-Out) sorting — **Not started**
-- [ ] Stock movement ledger (every delta tracked to actor, reason, timestamp) — **Not started**
-- [ ] Atomic dispensing transaction (atomic decrement + dispense item + invoice link) — **Not started**
-- [ ] Low stock & expiring batch alerts — **Not started**
+- [x] Drug, InventoryBatch, DispenseRecord, DispenseItem, StockMovement schema — **Tested**
+- [x] Drug catalog & formulary management with reorder levels & strength — **Tested**
+- [x] Inventory batch receiving with FEFO (First-Expired-First-Out) sorting — **Tested**
+- [x] Stock movement ledger (every delta tracked to actor, reason, timestamp) — **Tested**
+- [x] Atomic dispensing transaction with SemaphoreSlim concurrency lock & idempotency — **Tested**
+- [x] Low stock & expiring batch alerts with printable medication labels — **Tested**
 
 ### Module G: Billing & Payments
 - [x] ServiceItem, Invoice, InvoiceLine, Payment, Refund schema — **Implemented**
