@@ -24,6 +24,7 @@ builder.Services.AddScoped<IPatientService, PatientService>();
 builder.Services.AddScoped<IAppointmentNumberGenerator, AppointmentNumberGenerator>();
 builder.Services.AddScoped<IAppointmentService, AppointmentService>();
 builder.Services.AddScoped<IClinicalService, ClinicalService>();
+builder.Services.AddScoped<ILabService, LabService>();
 
 // 3. JWT Authentication & Authorization
 var jwtSecret = builder.Configuration["JwtSettings:Secret"] 

@@ -645,6 +645,106 @@ class ApiClient {
   async getFormularyDrugs(): Promise<DrugDto[]> {
     return this.request<DrugDto[]>('/clinical/drugs');
   }
+
+  // Laboratory Management (Module E)
+  async getLabTests(category?: string, activeOnly = true): Promise<LabTestDto[]> {
+    const params = new URLSearchParams();
+    if (category) params.append('category', category);
+    params.append('activeOnly', activeOnly.toString());
+    const qs = params.toString();
+    return this.request<LabTestDto[]>(`/lab/tests${qs ? `?${qs}` : ''}`);
+  }
+
+  async getLabTestById(id: string): Promise<LabTestDto> {
+    return this.request<LabTestDto>(`/lab/tests/${id}`);
+  }
+
+  async createLabTest(data: CreateLabTestRequest): Promise<LabTestDto> {
+    return this.request<LabTestDto>('/lab/tests', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateLabTest(id: string, data: UpdateLabTestRequest): Promise<LabTestDto> {
+    return this.request<LabTestDto>(`/lab/tests/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getLabOrders(params?: {
+    encounterId?: string;
+    patientId?: string;
+    status?: LabOrderStatus;
+    priority?: LabPriority;
+    date?: string;
+    query?: string;
+    page?: number;
+    pageSize?: number;
+  }): Promise<PagedResult<LabOrderDto>> {
+    const searchParams = new URLSearchParams();
+    if (params?.encounterId) searchParams.append('encounterId', params.encounterId);
+    if (params?.patientId) searchParams.append('patientId', params.patientId);
+    if (params?.status !== undefined) searchParams.append('status', params.status.toString());
+    if (params?.priority !== undefined) searchParams.append('priority', params.priority.toString());
+    if (params?.date) searchParams.append('date', params.date);
+    if (params?.query) searchParams.append('query', params.query);
+    if (params?.page) searchParams.append('page', params.page.toString());
+    if (params?.pageSize) searchParams.append('pageSize', params.pageSize.toString());
+
+    const qs = searchParams.toString();
+    return this.request<PagedResult<LabOrderDto>>(`/lab/orders${qs ? `?${qs}` : ''}`);
+  }
+
+  async getLabOrderById(id: string): Promise<LabOrderDto> {
+    return this.request<LabOrderDto>(`/lab/orders/${id}`);
+  }
+
+  async getLabOrdersByEncounter(encounterId: string): Promise<LabOrderDto[]> {
+    return this.request<LabOrderDto[]>(`/lab/orders/encounter/${encounterId}`);
+  }
+
+  async createLabOrder(data: CreateLabOrderRequest): Promise<LabOrderDto> {
+    return this.request<LabOrderDto>('/lab/orders', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async collectSpecimen(id: string, data?: CollectSpecimenRequest): Promise<LabOrderDto> {
+    return this.request<LabOrderDto>(`/lab/orders/${id}/collect`, {
+      method: 'POST',
+      body: JSON.stringify(data || { items: [] }),
+    });
+  }
+
+  async receiveSpecimen(id: string): Promise<LabOrderDto> {
+    return this.request<LabOrderDto>(`/lab/orders/${id}/receive`, {
+      method: 'POST',
+    });
+  }
+
+  async recordLabResults(id: string, data: RecordLabResultsRequest): Promise<LabOrderDto> {
+    return this.request<LabOrderDto>(`/lab/orders/${id}/results`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async verifyAndReleaseOrder(id: string, data?: VerifyLabResultsRequest): Promise<LabOrderDto> {
+    return this.request<LabOrderDto>(`/lab/orders/${id}/verify`, {
+      method: 'POST',
+      body: JSON.stringify(data || { releaseImmediately: true }),
+    });
+  }
+
+  async cancelLabOrder(id: string, reason: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/lab/orders/${id}/cancel`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+  }
 }
 
 // Module C (Appointments & Scheduling) Interfaces
@@ -967,6 +1067,154 @@ export interface DrugDto {
   strength: string;
   reorderLevel: number;
   isActive: boolean;
+}
+
+// Module E (Laboratory Management) Interfaces
+export type LabOrderStatus =
+  | 0 // Ordered
+  | 1 // Collected
+  | 2 // Received
+  | 3 // Processing
+  | 4 // DraftResult
+  | 5 // Verified
+  | 6 // Released
+  | 7 // Corrected
+  | 8 // Cancelled
+  | 9; // Rejected
+
+export const LAB_ORDER_STATUS_NAMES: Record<LabOrderStatus, string> = {
+  0: 'Ordered',
+  1: 'Collected',
+  2: 'Received',
+  3: 'Processing',
+  4: 'Draft Result',
+  5: 'Verified',
+  6: 'Released',
+  7: 'Corrected',
+  8: 'Cancelled',
+  9: 'Rejected',
+};
+
+export type LabPriority =
+  | 0 // Routine
+  | 1 // Urgent
+  | 2; // Stat
+
+export const LAB_PRIORITY_NAMES: Record<LabPriority, string> = {
+  0: 'Routine',
+  1: 'Urgent',
+  2: 'Stat',
+};
+
+export interface LabTestDto {
+  id: string;
+  code: string;
+  name: string;
+  category: string;
+  specimenType: string;
+  unitOfMeasure?: string | null;
+  referenceRange?: string | null;
+  price: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateLabTestRequest {
+  code: string;
+  name: string;
+  category: string;
+  specimenType: string;
+  unitOfMeasure?: string;
+  referenceRange?: string;
+  price: number;
+}
+
+export interface UpdateLabTestRequest {
+  name: string;
+  category: string;
+  specimenType: string;
+  unitOfMeasure?: string;
+  referenceRange?: string;
+  price: number;
+  isActive: boolean;
+}
+
+export interface LabOrderItemDto {
+  id: string;
+  labOrderId: string;
+  labTestId: string;
+  labTestCode: string;
+  labTestName: string;
+  category: string;
+  specimenType: string;
+  price: number;
+  specimenBarcode?: string | null;
+  specimenCollectedAt?: string | null;
+  resultValue?: string | null;
+  resultUnit?: string | null;
+  referenceRangeSnapshot?: string | null;
+  isAbnormal: boolean;
+  comments?: string | null;
+  enteredByUserId?: string | null;
+  enteredByUserName?: string | null;
+  verifiedByUserId?: string | null;
+  verifiedByUserName?: string | null;
+  verifiedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LabOrderDto {
+  id: string;
+  orderNumber: string;
+  encounterId: string;
+  patientId: string;
+  patientNumber: string;
+  patientName: string;
+  patientDateOfBirth: string;
+  patientGender: string;
+  orderedByDoctorId: string;
+  doctorName: string;
+  doctorDepartment: string;
+  priority: LabPriority;
+  status: LabOrderStatus;
+  totalPrice: number;
+  createdAt: string;
+  updatedAt: string;
+  items: LabOrderItemDto[];
+}
+
+export interface CreateLabOrderRequest {
+  encounterId: string;
+  priority: LabPriority;
+  testIds: string[];
+}
+
+export interface CollectSpecimenItemRequest {
+  labOrderItemId: string;
+  customBarcode?: string;
+}
+
+export interface CollectSpecimenRequest {
+  items: CollectSpecimenItemRequest[];
+}
+
+export interface RecordLabResultItemRequest {
+  labOrderItemId: string;
+  resultValue: string;
+  resultUnit?: string;
+  isAbnormal: boolean;
+  comments?: string;
+}
+
+export interface RecordLabResultsRequest {
+  results: RecordLabResultItemRequest[];
+}
+
+export interface VerifyLabResultsRequest {
+  releaseImmediately: boolean;
+  verificationNotes?: string;
 }
 
 export const api = new ApiClient();

@@ -22,7 +22,7 @@ This implementation plan tracks the lifecycle, phase progress, and module status
 | **Phase 4** | Patient Management | **Tested** | Registration, unique patient IDs, duplicate detection, demographic editing, patient chart & timeline. |
 | **Phase 5** | Appointments & Scheduling | **Tested** | Doctor schedules, slot engine, transaction-safe booking, check-in queue, conflict prevention, cancellation. |
 | **Phase 6** | Clinical Management | **Tested** | Encounters, notes (SOAP), vitals, diagnoses, allergies, draft/signing lifecycle, immutable addenda, e-prescriptions. |
-| **Phase 7** | Laboratory Management | **Not started** | Test catalog, order worklist, specimen barcode tracking, result entry, dual-step verification, critical alerts. |
+| **Phase 7** | Laboratory Management | **Tested** | Test catalog, order worklist, specimen barcode tracking, result entry, dual-step verification, critical alerts. |
 | **Phase 8** | Pharmacy & Inventory | **Not started** | Drug catalog, FEFO batch tracking, expiry monitoring, transaction-safe dispensing, stock movements ledger. |
 | **Phase 9** | Billing & Payments | **Not started** | Service catalog, invoice generation, payment capture, idempotent transactions, receipts, refunds, shift close. |
 | **Phase 10** | Reports & Dashboard | **Not started** | Real-time database metrics, financial reconciliation, clinical turnaround, appointment stats, data export. |
@@ -70,13 +70,13 @@ This implementation plan tracks the lifecycle, phase progress, and module status
 - [x] Patient allergy recording with clinical alert banner & cross-allergy e-prescribing — **Tested**
 
 ### Module E: Laboratory Management
-- [x] LabTest, LabOrder, LabOrderItem schema — **Implemented**
-- [ ] Standard test catalog with reference ranges & units — **Not started**
-- [ ] Order generation linked to clinical encounter — **Not started**
-- [ ] Specimen barcode tracking & collection status — **Not started**
-- [ ] Lab result entry with normal/abnormal flagging — **Not started**
-- [ ] Two-step result verification & critical value escalation — **Not started**
-- [ ] Printable lab result report — **Not started**
+- [x] LabTest, LabOrder, LabOrderItem schema — **Tested**
+- [x] Standard test catalog with reference ranges & units — **Tested**
+- [x] Order generation linked to clinical encounter (`LAB-YYYY-XXXXX`) — **Tested**
+- [x] Specimen barcode tracking & collection status (`SP-YYYY-XXXXX-XX`) — **Tested**
+- [x] Lab result entry with normal/abnormal flagging — **Tested**
+- [x] Two-step result verification & critical value escalation — **Tested**
+- [x] Printable clinical lab result report — **Tested**
 
 ### Module F: Pharmacy & Inventory
 - [x] Drug, InventoryBatch, DispenseRecord, DispenseItem, StockMovement schema — **Implemented**

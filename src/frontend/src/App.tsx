@@ -29,6 +29,7 @@ import { AuditLogs } from './pages/AuditLogs';
 import { Patients } from './pages/Patients';
 import { Appointments } from './pages/Appointments';
 import { Clinical } from './pages/Clinical';
+import { Laboratory } from './pages/Laboratory';
 import './App.css';
 
 function MainAppShell() {
@@ -440,7 +441,9 @@ function MainAppShell() {
 
           {activeTab === 'clinical' && <Clinical />}
 
-          {activeTab !== 'foundation' && activeTab !== 'users' && activeTab !== 'audit' && activeTab !== 'patients' && activeTab !== 'appointments' && activeTab !== 'clinical' && (
+          {activeTab === 'laboratory' && <Laboratory />}
+
+          {activeTab !== 'foundation' && activeTab !== 'users' && activeTab !== 'audit' && activeTab !== 'patients' && activeTab !== 'appointments' && activeTab !== 'clinical' && activeTab !== 'laboratory' && (
             <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
               <AlertCircle size={40} color="#0d9488" style={{ margin: '0 auto 1rem auto' }} />
               <h2 style={{ fontSize: '1.25rem' }}>{navItems.find((n) => n.id === activeTab)?.label} Module</h2>
