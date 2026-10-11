@@ -1107,6 +1107,19 @@ class ApiClient {
     return this.downloadReportCsv(`/documents/${id}/download`, defaultFileName);
   }
 
+  async getDocumentBlobUrl(id: string): Promise<string> {
+    const headers: Record<string, string> = {};
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
+    }
+    const response = await fetch(`${API_BASE_URL}/documents/${id}/download`, { headers });
+    if (!response.ok) {
+      throw new Error(`Failed to load document stream: ${response.statusText}`);
+    }
+    const blob = await response.blob();
+    return window.URL.createObjectURL(blob);
+  }
+
   async deleteDocument(id: string): Promise<void> {
     return this.request<void>(`/documents/${id}`, { method: 'DELETE' });
   }

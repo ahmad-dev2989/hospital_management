@@ -17,7 +17,11 @@ import {
   ShieldAlert,
   Calendar,
   FileText,
-  CreditCard
+  CreditCard,
+  Upload,
+  Download,
+  Eye,
+  Image as ImageIcon
 } from 'lucide-react';
 import {
   api,
@@ -29,6 +33,9 @@ import {
   type AddConditionRequest,
   type DuplicateMatchDto,
   type AllergySeverity,
+  type DocumentDto,
+  type DocumentCategory,
+  DOCUMENT_CATEGORY_NAMES,
   type ApiError
 } from '../api/client';
 import { useNavigation } from '../context/NavigationContext';
@@ -36,6 +43,14 @@ import { useToast } from '../context/ToastContext';
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const GENDERS = ['Male', 'Female', 'Other'];
+
+const formatDocBytes = (bytes: number): string => {
+  if (!bytes || bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+};
 
 export const Patients: React.FC = () => {
   const {
@@ -64,8 +79,19 @@ export const Patients: React.FC = () => {
   // Active chart & selection
   const [activeChart, setActiveChart] = useState<PatientChartDto | null>(null);
   const [chartLoading, setChartLoading] = useState(false);
-  const [chartTab, setChartTab] = useState<'summary' | 'allergies' | 'conditions' | 'encounters'>('summary');
+  const [chartTab, setChartTab] = useState<'summary' | 'allergies' | 'conditions' | 'encounters' | 'documents'>('summary');
   const [selectedPatient, setSelectedPatient] = useState<PatientDto | null>(null);
+
+  // Patient Chart Documents State
+  const [patientDocs, setPatientDocs] = useState<DocumentDto[]>([]);
+  const [loadingDocs, setLoadingDocs] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<{ doc: DocumentDto; url: string } | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [showChartUploadModal, setShowChartUploadModal] = useState(false);
+  const [chartDocTitle, setChartDocTitle] = useState('');
+  const [chartDocCategory, setChartDocCategory] = useState<DocumentCategory>(3);
+  const [chartDocFile, setChartDocFile] = useState<File | null>(null);
+  const [chartUploading, setChartUploading] = useState(false);
 
   // Duplicate warning state
   const [duplicateMatches, setDuplicateMatches] = useState<DuplicateMatchDto[]>([]);
@@ -155,12 +181,25 @@ export const Patients: React.FC = () => {
     fetchPatients();
   };
 
+  const loadPatientDocs = async (patientId: string) => {
+    setLoadingDocs(true);
+    try {
+      const res = await api.getDocuments({ patientId, pageSize: 100 });
+      setPatientDocs(res.items);
+    } catch (err: any) {
+      console.error('Failed to load patient documents', err);
+    } finally {
+      setLoadingDocs(false);
+    }
+  };
+
   const handleOpenChart = async (patient: PatientDto) => {
     setSelectedPatient(patient);
     setActivePatient(patient); // Phase 12: Synchronize globally active patient
     setChartLoading(true);
     setShowChartModal(true);
     setChartTab('summary');
+    loadPatientDocs(patient.id);
     try {
       const chart = await api.getPatientChart(patient.id);
       setActiveChart(chart);
@@ -168,6 +207,70 @@ export const Patients: React.FC = () => {
       toast.error(err.message || 'Error loading clinical chart', 'Patient Chart Error');
     } finally {
       setChartLoading(false);
+    }
+  };
+
+  const handlePreviewDocument = async (doc: DocumentDto) => {
+    setPreviewLoading(true);
+    setPreviewDoc({ doc, url: '' });
+    try {
+      const url = await api.getDocumentBlobUrl(doc.id);
+      setPreviewDoc({ doc, url });
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to stream document preview', 'Preview Error');
+      setPreviewDoc(null);
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const handleDeletePatientDoc = async (doc: DocumentDto) => {
+    if (!window.confirm(`Permanently remove document "${doc.fileName}" from this patient's records?`)) {
+      return;
+    }
+    try {
+      await api.deleteDocument(doc.id);
+      toast.success('Document deleted successfully.');
+      if (selectedPatient) {
+        await loadPatientDocs(selectedPatient.id);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete document', 'Delete Error');
+    }
+  };
+
+  const handleChartUploadSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPatient || !chartDocFile || !chartDocTitle.trim()) {
+      toast.error('Please specify document name and select a file', 'Upload Error');
+      return;
+    }
+
+    setChartUploading(true);
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      let ext = '';
+      if (chartDocFile.name.includes('.')) {
+        ext = '.' + chartDocFile.name.split('.').pop();
+      }
+      const titlePart = chartDocTitle.trim();
+      const formattedFileName = `${titlePart} - ${today}${ext}`;
+
+      const formData = new FormData();
+      formData.append('patientId', selectedPatient.id);
+      formData.append('category', chartDocCategory.toString());
+      formData.append('file', chartDocFile, formattedFileName);
+
+      await api.uploadDocument(formData);
+      toast.success(`Document "${formattedFileName}" added to chart!`);
+      setShowChartUploadModal(false);
+      setChartDocTitle('');
+      setChartDocFile(null);
+      await loadPatientDocs(selectedPatient.id);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to upload document', 'Upload Error');
+    } finally {
+      setChartUploading(false);
     }
   };
 
@@ -1029,6 +1132,17 @@ export const Patients: React.FC = () => {
               >
                 Visits & Encounters ({activeChart?.recentEncounters?.length ?? 0})
               </button>
+              <button
+                className={`btn btn-sm ${chartTab === 'documents' ? 'btn-primary' : 'btn-outline'}`}
+                onClick={() => {
+                  setChartTab('documents');
+                  if (selectedPatient) loadPatientDocs(selectedPatient.id);
+                }}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+              >
+                <FileText size={13} />
+                <span>Documents & Scans ({patientDocs.length})</span>
+              </button>
             </div>
 
             {/* Chart Tab Content */}
@@ -1265,6 +1379,234 @@ export const Patients: React.FC = () => {
                       )}
                     </div>
                   )}
+
+                  {/* TAB 5: DOCUMENTS & SCANS */}
+                  {chartTab === 'documents' && selectedPatient && (
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                        <div>
+                          <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#0f172a' }}>
+                            Patient Medical Documentation & Diagnostic Scans
+                          </h4>
+                          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                            Radiology scans, lab reports, MRIs, X-rays, pathology and clinical records
+                          </span>
+                        </div>
+                        <button
+                          className="btn btn-primary btn-sm"
+                          onClick={() => {
+                            setChartDocTitle('');
+                            setChartDocFile(null);
+                            setShowChartUploadModal(true);
+                          }}
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                        >
+                          <Upload size={14} />
+                          <span>+ Attach Document / Scan</span>
+                        </button>
+                      </div>
+
+                      {loadingDocs ? (
+                        <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
+                          <RefreshCw size={24} className="spin" color="#0d9488" />
+                          <p style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}>Loading patient documents...</p>
+                        </div>
+                      ) : patientDocs.length === 0 ? (
+                        <div style={{
+                          padding: '3rem 1.5rem',
+                          textAlign: 'center',
+                          backgroundColor: '#f8fafc',
+                          borderRadius: '12px',
+                          border: '2px dashed #cbd5e1'
+                        }}>
+                          <div style={{
+                            width: '56px',
+                            height: '56px',
+                            borderRadius: '50%',
+                            backgroundColor: '#e0f2fe',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            margin: '0 auto 1rem auto'
+                          }}>
+                            <ImageIcon size={28} color="#0284c7" />
+                          </div>
+                          <h4 style={{ margin: '0 0 0.35rem 0', fontSize: '1rem' }}>No Documents or Scans Attached</h4>
+                          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', maxWidth: '420px', margin: '0 auto 1.25rem auto' }}>
+                            Attach MRI scan pictures, chest X-rays, CT scans, blood test sheets, discharge summaries, or identity cards.
+                          </p>
+                          <button
+                            className="btn btn-primary btn-sm"
+                            onClick={() => {
+                              setChartDocTitle('');
+                              setChartDocFile(null);
+                              setShowChartUploadModal(true);
+                            }}
+                          >
+                            <Upload size={14} style={{ marginRight: '0.35rem' }} />
+                            Add Patient Document
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fill, minmax(185px, 1fr))',
+                          gap: '1rem'
+                        }}>
+                          {patientDocs.map((doc) => {
+                            const isImage = doc.mimeType?.startsWith('image/') || /\.(jpe?g|png|webp|gif)$/i.test(doc.fileName);
+                            const isPdf = doc.mimeType === 'application/pdf' || /\.pdf$/i.test(doc.fileName);
+                            const ext = doc.fileName.includes('.') ? doc.fileName.split('.').pop() : 'FILE';
+
+                            return (
+                              <div
+                                key={doc.id}
+                                onClick={() => handlePreviewDocument(doc)}
+                                style={{
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  textAlign: 'center',
+                                  padding: '1rem 0.85rem',
+                                  borderRadius: '12px',
+                                  border: '1.5px solid #e2e8f0',
+                                  background: '#ffffff',
+                                  boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s ease',
+                                  position: 'relative'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.transform = 'translateY(-3px)';
+                                  e.currentTarget.style.borderColor = '#0d9488';
+                                  e.currentTarget.style.boxShadow = '0 8px 16px rgba(13,148,136,0.12)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.transform = 'none';
+                                  e.currentTarget.style.borderColor = '#e2e8f0';
+                                  e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.04)';
+                                }}
+                              >
+                                {/* Square Icon/Thumbnail Container */}
+                                <div style={{
+                                  width: '72px',
+                                  height: '72px',
+                                  borderRadius: '10px',
+                                  backgroundColor: isImage ? '#f0fdf4' : isPdf ? '#fef2f2' : '#f0f9ff',
+                                  border: `1.5px solid ${isImage ? '#bbf7d0' : isPdf ? '#fecaca' : '#bae6fd'}`,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  marginBottom: '0.75rem',
+                                  position: 'relative'
+                                }}>
+                                  {isImage ? (
+                                    <ImageIcon size={34} color="#16a34a" />
+                                  ) : (
+                                    <FileText size={34} color={isPdf ? '#dc2626' : '#0284c7'} />
+                                  )}
+                                  <span style={{
+                                    position: 'absolute',
+                                    bottom: '-5px',
+                                    right: '-5px',
+                                    fontSize: '0.62rem',
+                                    fontWeight: 700,
+                                    textTransform: 'uppercase',
+                                    padding: '1px 5px',
+                                    borderRadius: '4px',
+                                    backgroundColor: '#0f172a',
+                                    color: '#ffffff',
+                                    boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
+                                  }}>
+                                    {ext}
+                                  </span>
+                                </div>
+
+                                {/* Document Name */}
+                                <strong style={{
+                                  fontSize: '0.85rem',
+                                  lineHeight: '1.25',
+                                  color: '#0f172a',
+                                  marginBottom: '0.35rem',
+                                  wordBreak: 'break-word',
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: 'vertical',
+                                  overflow: 'hidden',
+                                  minHeight: '2.1rem'
+                                }} title={doc.fileName}>
+                                  {doc.fileName}
+                                </strong>
+
+                                {/* Upload Date Tag */}
+                                <div style={{
+                                  fontSize: '0.72rem',
+                                  color: '#64748b',
+                                  marginBottom: '0.4rem',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.25rem'
+                                }}>
+                                  <Calendar size={11} />
+                                  <span>{new Date(doc.createdAt).toLocaleDateString()}</span>
+                                </div>
+
+                                {/* Category & Size Badge */}
+                                <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
+                                  <span className="badge badge-info" style={{ fontSize: '0.65rem', padding: '2px 6px' }}>
+                                    {DOCUMENT_CATEGORY_NAMES[doc.category] || doc.categoryName}
+                                  </span>
+                                  <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>
+                                    {formatDocBytes(doc.sizeBytes)}
+                                  </span>
+                                </div>
+
+                                {/* Quick Action Bar */}
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    gap: '0.35rem',
+                                    marginTop: '0.75rem',
+                                    paddingTop: '0.5rem',
+                                    borderTop: '1px solid #f1f5f9',
+                                    width: '100%',
+                                    justifyContent: 'center'
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <button
+                                    className="btn btn-sm btn-outline"
+                                    onClick={() => handlePreviewDocument(doc)}
+                                    title="View Image / Scan"
+                                    style={{ padding: '0.25rem 0.45rem', fontSize: '0.7rem', color: '#0d9488', borderColor: '#99f6e4' }}
+                                  >
+                                    <Eye size={12} />
+                                    <span style={{ marginLeft: '2px' }}>View</span>
+                                  </button>
+                                  <button
+                                    className="btn btn-sm btn-outline"
+                                    onClick={() => api.downloadDocument(doc.id, doc.fileName)}
+                                    title="Download File"
+                                    style={{ padding: '0.25rem 0.45rem', fontSize: '0.7rem' }}
+                                  >
+                                    <Download size={12} color="#0284c7" />
+                                  </button>
+                                  <button
+                                    className="btn btn-sm btn-outline"
+                                    onClick={() => handleDeletePatientDoc(doc)}
+                                    title="Delete Record"
+                                    style={{ padding: '0.25rem 0.45rem', fontSize: '0.7rem', borderColor: '#fecaca' }}
+                                  >
+                                    <Trash2 size={12} color="#ef4444" />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -1407,6 +1749,185 @@ export const Patients: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ATTACH PATIENT DOCUMENT / SCAN MODAL */}
+      {showChartUploadModal && selectedPatient && (
+        <div className="modal-backdrop">
+          <div className="modal-content card" style={{ maxWidth: '520px' }}>
+            <div className="modal-header">
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.15rem' }}>Attach Patient Documentation or Scan</h3>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  Patient: <strong>{selectedPatient.fullName}</strong> ({selectedPatient.patientNumber})
+                </span>
+              </div>
+              <button className="modal-close" onClick={() => setShowChartUploadModal(false)}>×</button>
+            </div>
+
+            <form onSubmit={handleChartUploadSubmit} style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="form-group">
+                <label className="form-label">Document Name / Title *</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. Brain MRI Scan, Chest X-Ray, Blood Chemistry Report"
+                  value={chartDocTitle}
+                  onChange={(e) => setChartDocTitle(e.target.value)}
+                  required
+                />
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem', display: 'block' }}>
+                  Stored name will include today's date: <strong>{chartDocTitle.trim() ? `${chartDocTitle.trim()} - ${new Date().toISOString().split('T')[0]}` : `[Document Name] - ${new Date().toISOString().split('T')[0]}`}</strong>
+                </span>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Category *</label>
+                <select
+                  className="form-input"
+                  value={chartDocCategory}
+                  onChange={(e) => setChartDocCategory(parseInt(e.target.value, 10) as DocumentCategory)}
+                >
+                  <option value={3}>Diagnostic Scan / Imaging (MRI, X-Ray, CT, Ultrasound)</option>
+                  <option value={1}>Laboratory Report (Blood, Pathology, Urine)</option>
+                  <option value={0}>General Clinical Document</option>
+                  <option value={2}>Prescription & Medication Order</option>
+                  <option value={4}>Specialist Referral</option>
+                  <option value={5}>Patient Identity & Insurance Card</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Select File / Scan Image from Computer *</label>
+                <input
+                  type="file"
+                  className="form-input"
+                  accept="image/*,application/pdf,.dicom,.dcm,text/plain"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files.length > 0) {
+                      const file = e.target.files[0];
+                      setChartDocFile(file);
+                      if (!chartDocTitle.trim()) {
+                        const nameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
+                        setChartDocTitle(nameWithoutExt);
+                      }
+                    }
+                  }}
+                  required
+                />
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  Supports JPEG, PNG, WEBP, PDF, DICOM up to 25 MB.
+                </span>
+              </div>
+
+              <div className="modal-actions" style={{ marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => setShowChartUploadModal(false)}
+                  disabled={chartUploading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={chartUploading || !chartDocFile || !chartDocTitle.trim()}
+                >
+                  {chartUploading ? 'Uploading & Hashing...' : 'Upload & Save to Chart'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* PATIENT DOCUMENT / SCAN IMAGE LIGHTBOX PREVIEW MODAL */}
+      {previewDoc && (
+        <div className="modal-backdrop">
+          <div className="modal-content card" style={{ maxWidth: '880px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+            <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <FileText size={22} color="#0d9488" />
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', wordBreak: 'break-all' }}>
+                    {previewDoc.doc.fileName}
+                  </h3>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                    Patient: <strong>{previewDoc.doc.patientName}</strong> • Date Added: <strong>{new Date(previewDoc.doc.createdAt).toLocaleDateString()}</strong> • Category: {DOCUMENT_CATEGORY_NAMES[previewDoc.doc.category] || previewDoc.doc.categoryName}
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <button
+                  className="btn btn-sm btn-outline"
+                  onClick={() => api.downloadDocument(previewDoc.doc.id, previewDoc.doc.fileName)}
+                  title="Download file"
+                >
+                  <Download size={14} />
+                  <span>Download</span>
+                </button>
+                <button className="modal-close" onClick={() => setPreviewDoc(null)}>×</button>
+              </div>
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', textAlign: 'center', background: '#0f172a', borderRadius: '8px', minHeight: '340px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {previewLoading ? (
+                <div style={{ padding: '3rem', color: '#94a3b8' }}>
+                  <RefreshCw size={26} className="spin" color="#0d9488" />
+                  <p style={{ marginTop: '0.75rem', fontSize: '0.85rem' }}>Streaming scan image from storage...</p>
+                </div>
+              ) : previewDoc.url ? (
+                previewDoc.doc.mimeType?.startsWith('image/') || /\.(jpe?g|png|webp|gif)$/i.test(previewDoc.doc.fileName) ? (
+                  <img
+                    src={previewDoc.url}
+                    alt={previewDoc.doc.fileName}
+                    style={{
+                      maxWidth: '100%',
+                      maxHeight: '68vh',
+                      objectFit: 'contain',
+                      borderRadius: '6px',
+                      boxShadow: '0 8px 30px rgba(0,0,0,0.5)'
+                    }}
+                  />
+                ) : previewDoc.doc.mimeType === 'application/pdf' || /\.pdf$/i.test(previewDoc.doc.fileName) ? (
+                  <iframe
+                    src={previewDoc.url}
+                    title={previewDoc.doc.fileName}
+                    style={{ width: '100%', height: '68vh', border: 'none', borderRadius: '6px', background: '#ffffff' }}
+                  />
+                ) : (
+                  <div style={{ padding: '3rem', background: '#ffffff', borderRadius: '8px', maxWidth: '420px', margin: '0 auto' }}>
+                    <FileText size={48} color="#0d9488" style={{ marginBottom: '1rem' }} />
+                    <h4 style={{ color: '#0f172a' }}>{previewDoc.doc.fileName}</h4>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
+                      Binary file format ({previewDoc.doc.mimeType}) requires direct download.
+                    </p>
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => api.downloadDocument(previewDoc.doc.id, previewDoc.doc.fileName)}
+                    >
+                      <Download size={16} /> Download File ({formatDocBytes(previewDoc.doc.sizeBytes)})
+                    </button>
+                  </div>
+                )
+              ) : (
+                <div style={{ color: '#94a3b8' }}>
+                  Preview stream is not available for this record.
+                </div>
+              )}
+            </div>
+
+            <div className="modal-actions" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                Size: <strong>{formatDocBytes(previewDoc.doc.sizeBytes)}</strong> • Checksum: <code>{previewDoc.doc.sha256Hash?.substring(0, 16)}...</code>
+              </span>
+              <button className="btn btn-outline" onClick={() => setPreviewDoc(null)}>
+                Close Preview
+              </button>
+            </div>
           </div>
         </div>
       )}

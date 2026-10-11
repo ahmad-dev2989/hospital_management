@@ -17,7 +17,8 @@ import {
   Search,
   Layers,
   Sparkles,
-  UserCheck
+  UserCheck,
+  Eye
 } from 'lucide-react';
 import {
   api,
@@ -59,11 +60,18 @@ export const Settings: React.FC = () => {
   
   // Upload modal state
   const [uploadPatientQuery, setUploadPatientQuery] = useState('');
-  const [uploadPatients, setUploadPatients] = useState<PatientDto[]>([]);
+  const [allPatients, setAllPatients] = useState<PatientDto[]>([]);
+  const [filteredPatients, setFilteredPatients] = useState<PatientDto[]>([]);
+  const [showPatientDropdown, setShowPatientDropdown] = useState(false);
   const [selectedPatientId, setSelectedPatientId] = useState<string>('');
+  const [docTitle, setDocTitle] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<DocumentCategory>(0);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+
+  // Document preview lightbox state
+  const [previewDoc, setPreviewDoc] = useState<{ doc: DocumentDto; url: string } | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   // TAB 3: Database Backups State
   const [backups, setBackups] = useState<DatabaseBackupDto[]>([]);
@@ -168,18 +176,61 @@ export const Settings: React.FC = () => {
     }
   };
 
-  // Tab 2: Upload Document
-  const searchPatientsForUpload = async (term: string) => {
+  // Tab 2: Upload Document & Patient Filtering
+  const handleOpenUploadModal = async () => {
+    setShowUploadModal(true);
+    setUploadPatientQuery('');
+    setSelectedPatientId('');
+    setDocTitle('');
+    setSelectedFile(null);
+    setShowPatientDropdown(false);
+
+    try {
+      const res = await api.getPatients({ page: 1, pageSize: 200 });
+      const sorted = [...res.items].sort((a, b) => a.fullName.localeCompare(b.fullName));
+      setAllPatients(sorted);
+      setFilteredPatients(sorted);
+    } catch (err) {
+      console.error('Failed to load patients for upload', err);
+    }
+  };
+
+  const handlePatientQueryChange = (term: string) => {
     setUploadPatientQuery(term);
-    if (term.trim().length >= 2) {
-      try {
-        const res = await api.getPatients({ query: term.trim(), page: 1, pageSize: 5 });
-        setUploadPatients(res.items);
-      } catch {
-        setUploadPatients([]);
-      }
-    } else {
-      setUploadPatients([]);
+    setShowPatientDropdown(true);
+    setSelectedPatientId('');
+
+    if (!term.trim()) {
+      setFilteredPatients(allPatients);
+      return;
+    }
+
+    const q = term.toLowerCase().trim();
+    // Prioritize names starting with query, followed by names containing query
+    const startsWith = allPatients.filter(p =>
+      p.fullName.toLowerCase().startsWith(q) ||
+      p.patientNumber.toLowerCase().startsWith(q)
+    );
+    const contains = allPatients.filter(p =>
+      !p.fullName.toLowerCase().startsWith(q) &&
+      !p.patientNumber.toLowerCase().startsWith(q) &&
+      (p.fullName.toLowerCase().includes(q) || p.patientNumber.toLowerCase().includes(q))
+    );
+
+    setFilteredPatients([...startsWith, ...contains]);
+  };
+
+  const handlePreviewDocument = async (doc: DocumentDto) => {
+    setPreviewLoading(true);
+    setPreviewDoc({ doc, url: '' });
+    try {
+      const url = await api.getDocumentBlobUrl(doc.id);
+      setPreviewDoc({ doc, url });
+    } catch (err: any) {
+      alert('Failed to load document preview: ' + (err.message || 'Unknown error'));
+      setPreviewDoc(null);
+    } finally {
+      setPreviewLoading(false);
     }
   };
 
@@ -193,17 +244,27 @@ export const Settings: React.FC = () => {
     setUploading(true);
     setError(null);
     try {
+      const today = new Date().toISOString().split('T')[0];
+      let ext = '';
+      if (selectedFile.name.includes('.')) {
+        ext = '.' + selectedFile.name.split('.').pop();
+      }
+      const titlePart = (docTitle.trim() || selectedFile.name.replace(/\.[^/.]+$/, "")).trim();
+      const formattedFileName = `${titlePart} - ${today}${ext}`;
+
       const formData = new FormData();
       formData.append('patientId', selectedPatientId);
       formData.append('category', selectedCategory.toString());
-      formData.append('file', selectedFile);
+      formData.append('file', selectedFile, formattedFileName);
 
       await api.uploadDocument(formData);
       setShowUploadModal(false);
       setSelectedFile(null);
       setSelectedPatientId('');
+      setDocTitle('');
       setUploadPatientQuery('');
-      setSuccessMsg('Document successfully uploaded, SHA-256 hashed, and stored.');
+      setShowPatientDropdown(false);
+      setSuccessMsg(`Document '${formattedFileName}' successfully uploaded, SHA-256 hashed, and stored.`);
       setTimeout(() => setSuccessMsg(null), 3500);
       loadDocuments();
     } catch (err: any) {
@@ -658,7 +719,7 @@ export const Settings: React.FC = () => {
 
             <button
               className="btn btn-primary"
-              onClick={() => setShowUploadModal(true)}
+              onClick={handleOpenUploadModal}
               style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
             >
               <Upload size={16} />
@@ -729,6 +790,14 @@ export const Settings: React.FC = () => {
                           <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>
                             <button
                               className="btn btn-outline"
+                              onClick={() => handlePreviewDocument(doc)}
+                              title="Preview document / image"
+                              style={{ padding: '0.3rem 0.5rem', borderColor: '#38bdf8' }}
+                            >
+                              <Eye size={14} color="#0284c7" />
+                            </button>
+                            <button
+                              className="btn btn-outline"
                               onClick={() => api.downloadDocument(doc.id, doc.fileName)}
                               title="Download document from local storage"
                               style={{ padding: '0.3rem 0.5rem' }}
@@ -756,52 +825,113 @@ export const Settings: React.FC = () => {
           {/* Upload Modal */}
           {showUploadModal && (
             <div className="modal-backdrop">
-              <div className="modal-card" style={{ maxWidth: '520px' }}>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: '0 0 1rem 0' }}>
-                  Upload Patient Document to Secure Local Storage
-                </h3>
+              <div className="modal-card" style={{ maxWidth: '540px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>
+                    Upload Patient Document to Secure Storage
+                  </h3>
+                  <button className="modal-close" onClick={() => setShowUploadModal(false)}>×</button>
+                </div>
 
                 <form onSubmit={handleUploadSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   
-                  {/* Select Patient */}
-                  <div className="form-group">
+                  {/* Select Patient with Live Instant Dropdown & Filtering */}
+                  <div className="form-group" style={{ position: 'relative' }}>
                     <label className="form-label">Search & Select Patient *</label>
                     <input
                       type="text"
                       className="form-input"
-                      placeholder="Type patient name or ID..."
+                      placeholder="Click to browse all patients or type any letter to filter..."
                       value={uploadPatientQuery}
-                      onChange={(e) => searchPatientsForUpload(e.target.value)}
+                      onFocus={() => {
+                        setShowPatientDropdown(true);
+                        if (!uploadPatientQuery.trim()) {
+                          setFilteredPatients(allPatients);
+                        }
+                      }}
+                      onClick={() => {
+                        setShowPatientDropdown(true);
+                        if (!uploadPatientQuery.trim()) {
+                          setFilteredPatients(allPatients);
+                        }
+                      }}
+                      onChange={(e) => handlePatientQueryChange(e.target.value)}
+                      required
                     />
-                    {uploadPatients.length > 0 && (
+                    {showPatientDropdown && (
                       <div style={{
-                        marginTop: '0.25rem',
-                        border: '1px solid var(--border)',
-                        borderRadius: '6px',
+                        marginTop: '0.35rem',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '8px',
                         background: '#ffffff',
-                        maxHeight: '130px',
-                        overflowY: 'auto'
+                        maxHeight: '190px',
+                        overflowY: 'auto',
+                        boxShadow: '0 8px 20px rgba(0,0,0,0.12)',
+                        zIndex: 30
                       }}>
-                        {uploadPatients.map((p) => (
-                          <div
-                            key={p.id}
-                            onClick={() => {
-                              setSelectedPatientId(p.id);
-                              setUploadPatientQuery(`${p.fullName} (${p.patientNumber})`);
-                              setUploadPatients([]);
-                            }}
-                            style={{
-                              padding: '0.45rem 0.75rem',
-                              cursor: 'pointer',
-                              borderBottom: '1px solid #f1f5f9',
-                              fontSize: '0.85rem'
-                            }}
-                          >
-                            <strong>{p.fullName}</strong> — {p.patientNumber} (DOB: {p.dateOfBirth.split('T')[0]})
+                        <div style={{ padding: '0.35rem 0.75rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '0.75rem', color: '#64748b', display: 'flex', justifyContent: 'space-between' }}>
+                          <span>Matching Patients ({filteredPatients.length})</span>
+                          <span>Click to select</span>
+                        </div>
+                        {filteredPatients.length === 0 ? (
+                          <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                            No patients found matching "{uploadPatientQuery}"
                           </div>
-                        ))}
+                        ) : (
+                          filteredPatients.map((p) => {
+                            const isSelected = selectedPatientId === p.id;
+                            return (
+                              <div
+                                key={p.id}
+                                onClick={() => {
+                                  setSelectedPatientId(p.id);
+                                  setUploadPatientQuery(`${p.fullName} (${p.patientNumber})`);
+                                  setShowPatientDropdown(false);
+                                }}
+                                style={{
+                                  padding: '0.55rem 0.75rem',
+                                  cursor: 'pointer',
+                                  borderBottom: '1px solid #f1f5f9',
+                                  fontSize: '0.85rem',
+                                  backgroundColor: isSelected ? '#f0fdfa' : '#ffffff',
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center'
+                                }}
+                                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
+                                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = isSelected ? '#f0fdfa' : '#ffffff')}
+                              >
+                                <div>
+                                  <strong style={{ color: '#0f172a' }}>{p.fullName}</strong>
+                                  <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', color: '#0d9488', fontWeight: 600 }}>
+                                    {p.patientNumber}
+                                  </span>
+                                </div>
+                                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                                  {p.gender} • {p.age ? `${p.age} yrs` : p.dateOfBirth?.split('T')[0]}
+                                </span>
+                              </div>
+                            );
+                          })
+                        )}
                       </div>
                     )}
+                  </div>
+
+                  {/* Document Name / Title */}
+                  <div className="form-group">
+                    <label className="form-label">Document Name / Title *</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="e.g. Brain MRI Scan, Chest X-Ray, Blood Report"
+                      value={docTitle}
+                      onChange={(e) => setDocTitle(e.target.value)}
+                      required
+                    />
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      Filename will be stored with today's date: <strong>{docTitle.trim() ? `${docTitle.trim()} - ${new Date().toISOString().split('T')[0]}` : `[Document Name] - ${new Date().toISOString().split('T')[0]}`}</strong>
+                    </span>
                   </div>
 
                   {/* Document Category */}
@@ -830,12 +960,17 @@ export const Settings: React.FC = () => {
                       onChange={(e) => {
                         if (e.target.files && e.target.files.length > 0) {
                           setSelectedFile(e.target.files[0]);
+                          if (!docTitle) {
+                            // Suggest base name without extension
+                            const nameWithoutExt = e.target.files[0].name.replace(/\.[^/.]+$/, "");
+                            setDocTitle(nameWithoutExt);
+                          }
                         }
                       }}
                       required
                     />
                     <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                      Supports PDF, images, DICOM, text up to 25 MB. Files are SHA-256 hashed on storage.
+                      Supports JPEG, PNG, WEBP, PDF, DICOM, TXT up to 25 MB.
                     </span>
                   </div>
 
@@ -851,12 +986,93 @@ export const Settings: React.FC = () => {
                     <button
                       type="submit"
                       className="btn btn-primary"
-                      disabled={uploading || !selectedFile || !selectedPatientId}
+                      disabled={uploading || !selectedFile || !selectedPatientId || !docTitle.trim()}
                     >
-                      {uploading ? 'Hashing & Storing...' : 'Upload & Store File'}
+                      {uploading ? 'Hashing & Storing...' : 'Upload & Store Document'}
                     </button>
                   </div>
                 </form>
+              </div>
+            </div>
+          )}
+
+          {/* Document Preview Lightbox Modal */}
+          {previewDoc && (
+            <div className="modal-backdrop">
+              <div className="modal-content card" style={{ maxWidth: '880px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+                <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <FileText size={20} color="#0d9488" />
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: '1.1rem', wordBreak: 'break-all' }}>
+                        {previewDoc.doc.fileName}
+                      </h3>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                        Patient: <strong>{previewDoc.doc.patientName}</strong> ({previewDoc.doc.patientNumber}) • Added: {new Date(previewDoc.doc.createdAt).toLocaleDateString()}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <button
+                      className="btn btn-sm btn-outline"
+                      onClick={() => api.downloadDocument(previewDoc.doc.id, previewDoc.doc.fileName)}
+                      title="Download document"
+                    >
+                      <Download size={14} /> Download
+                    </button>
+                    <button className="modal-close" onClick={() => setPreviewDoc(null)}>×</button>
+                  </div>
+                </div>
+
+                <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', textAlign: 'center', background: '#f8fafc', borderRadius: '8px' }}>
+                  {previewLoading ? (
+                    <div style={{ padding: '3rem' }}>
+                      <RefreshCw size={24} className="spin" color="#0d9488" />
+                      <p style={{ marginTop: '0.75rem', fontSize: '0.85rem' }}>Loading document preview stream...</p>
+                    </div>
+                  ) : previewDoc.url ? (
+                    previewDoc.doc.mimeType?.startsWith('image/') || /\.(jpe?g|png|webp|gif)$/i.test(previewDoc.doc.fileName) ? (
+                      <img
+                        src={previewDoc.url}
+                        alt={previewDoc.doc.fileName}
+                        style={{ maxWidth: '100%', maxHeight: '65vh', objectFit: 'contain', borderRadius: '8px', boxShadow: '0 4px 16px rgba(0,0,0,0.1)' }}
+                      />
+                    ) : previewDoc.doc.mimeType === 'application/pdf' || /\.pdf$/i.test(previewDoc.doc.fileName) ? (
+                      <iframe
+                        src={previewDoc.url}
+                        title={previewDoc.doc.fileName}
+                        style={{ width: '100%', height: '65vh', border: 'none', borderRadius: '8px' }}
+                      />
+                    ) : (
+                      <div style={{ padding: '3rem', background: '#ffffff', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                        <FileText size={48} color="#0d9488" style={{ marginBottom: '1rem' }} />
+                        <h4>{previewDoc.doc.fileName}</h4>
+                        <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
+                          File format ({previewDoc.doc.mimeType}) cannot be directly embedded in browser.
+                        </p>
+                        <button
+                          className="btn btn-primary"
+                          onClick={() => api.downloadDocument(previewDoc.doc.id, previewDoc.doc.fileName)}
+                        >
+                          <Download size={16} /> Download File ({formatBytes(previewDoc.doc.sizeBytes)})
+                        </button>
+                      </div>
+                    )
+                  ) : (
+                    <div style={{ padding: '2rem', color: 'var(--text-muted)' }}>
+                      Preview not available.
+                    </div>
+                  )}
+                </div>
+
+                <div className="modal-actions" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    SHA-256: <code>{previewDoc.doc.sha256Hash?.substring(0, 16)}...</code> • Category: {previewDoc.doc.categoryName || DOCUMENT_CATEGORY_NAMES[previewDoc.doc.category]}
+                  </span>
+                  <button className="btn btn-outline" onClick={() => setPreviewDoc(null)}>
+                    Close Preview
+                  </button>
+                </div>
               </div>
             </div>
           )}
