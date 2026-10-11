@@ -11,8 +11,7 @@ import {
   Plus,
   RefreshCw,
   AlertTriangle,
-  FileText,
-  Sparkles
+  FileText
 } from 'lucide-react';
 import {
   api,
@@ -82,45 +81,42 @@ export const Appointments: React.FC = () => {
       ? doctors[0]
       : null;
 
-  // Doctor Shifts & Slots Management Modal State
+  // Doctor Time Slot Settings Modal State
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [scheduleDoctorId, setScheduleDoctorId] = useState('');
-  const [scheduleApplyToAllDays, setScheduleApplyToAllDays] = useState(true);
-  const [allDaysShifts, setAllDaysShifts] = useState<Array<{ startTime: string; endTime: string }>>([
+
+  // Default Time Slots (applied to all days)
+  const [defaultShifts, setDefaultShifts] = useState<Array<{ startTime: string; endTime: string }>>([
     { startTime: '13:00', endTime: '17:00' }, // 1 PM - 5 PM
   ]);
-  const [dayCustomShifts, setDayCustomShifts] = useState<Record<number, Array<{ startTime: string; endTime: string }>>>({
-    1: [{ startTime: '13:00', endTime: '19:00' }], // Mon (1-7 PM)
-    2: [{ startTime: '13:00', endTime: '19:00' }], // Tue
-    3: [{ startTime: '13:00', endTime: '19:00' }], // Wed
-    4: [{ startTime: '13:00', endTime: '19:00' }], // Thu
-    5: [{ startTime: '13:00', endTime: '19:00' }], // Fri
-    6: [{ startTime: '13:00', endTime: '19:00' }], // Sat
-    0: [{ startTime: '10:00', endTime: '15:00' }], // Sun (10-3 PM)
+
+  // Per-day time slot windows (0=Sun, 1=Mon, ..., 6=Sat)
+  const [dayShiftsMap, setDayShiftsMap] = useState<Record<number, Array<{ startTime: string; endTime: string }>>>({
+    1: [{ startTime: '13:00', endTime: '17:00' }], // Mon
+    2: [{ startTime: '13:00', endTime: '17:00' }], // Tue
+    3: [{ startTime: '13:00', endTime: '17:00' }], // Wed
+    4: [{ startTime: '13:00', endTime: '17:00' }], // Thu
+    5: [{ startTime: '13:00', endTime: '17:00' }], // Fri
+    6: [{ startTime: '13:00', endTime: '17:00' }], // Sat
+    0: [{ startTime: '13:00', endTime: '17:00' }], // Sun
   });
-  const [activeDayTab, setActiveDayTab] = useState<number>(1); // Monday default
+
+  // Track which days are customized
+  const [customizedDays, setCustomizedDays] = useState<Record<number, boolean>>({});
+
+  // Active day being edited/expanded (null or 0..6)
+  const [selectedEditDay, setSelectedEditDay] = useState<number | null>(null);
+
   const [scheduleSaving, setScheduleSaving] = useState(false);
 
-  // Helper to calculate preview 15-min slots for a start and end time
-  const getPreviewSlots = (startTime: string, endTime: string, stepMinutes = 15): string[] => {
-    if (!startTime || !endTime) return [];
-    const [sH, sM] = startTime.split(':').map(Number);
-    const [eH, eM] = endTime.split(':').map(Number);
-    if (isNaN(sH) || isNaN(eH)) return [];
-    const startTotal = sH * 60 + sM;
-    const endTotal = eH * 60 + eM;
-    if (endTotal <= startTotal) return [];
-
-    const slots: string[] = [];
-    for (let t = startTotal; t + stepMinutes <= endTotal; t += stepMinutes) {
-      const hours = Math.floor(t / 60);
-      const mins = t % 60;
-      const period = hours >= 12 ? 'PM' : 'AM';
-      const displayH = hours % 12 === 0 ? 12 : hours % 12;
-      const displayM = mins.toString().padStart(2, '0');
-      slots.push(`${displayH}:${displayM} ${period}`);
-    }
-    return slots;
+  const formatTime12h = (t: string) => {
+    if (!t) return '';
+    const [h, m] = t.split(':').map(Number);
+    if (isNaN(h)) return t;
+    const period = h >= 12 ? 'PM' : 'AM';
+    const displayH = h % 12 === 0 ? 12 : h % 12;
+    const displayM = (m || 0).toString().padStart(2, '0');
+    return `${displayH}:${displayM} ${period}`;
   };
 
   // Reschedule form state
@@ -362,15 +358,17 @@ export const Appointments: React.FC = () => {
   const handleSaveDoctorSchedules = async () => {
     const targetDocId = scheduleDoctorId || (singleCandidateDoctor ? singleCandidateDoctor.id : bookDoctorId || doctors[0]?.id);
     if (!targetDocId) {
-      alert('Please select a doctor to configure shifts for.');
+      alert('Please select a doctor to configure time slots for.');
       return;
     }
 
     setScheduleSaving(true);
     try {
-      if (scheduleApplyToAllDays) {
-        if (allDaysShifts.length === 0) {
-          alert('Please add at least one shift window.');
+      const hasCustomDays = Object.values(customizedDays).some((v) => v);
+
+      if (!hasCustomDays) {
+        if (defaultShifts.length === 0) {
+          alert('Please add at least one time slot.');
           setScheduleSaving(false);
           return;
         }
@@ -379,7 +377,7 @@ export const Appointments: React.FC = () => {
           days: [
             {
               dayOfWeek: 1, // applied to all 7 days by backend
-              shifts: allDaysShifts.map((s) => ({
+              shifts: defaultShifts.map((s) => ({
                 startTime: s.startTime,
                 endTime: s.endTime,
                 slotDurationMinutes: 15,
@@ -393,7 +391,7 @@ export const Appointments: React.FC = () => {
           applyToAllDays: false,
           days: [0, 1, 2, 3, 4, 5, 6].map((dayNum) => ({
             dayOfWeek: dayNum,
-            shifts: (dayCustomShifts[dayNum] || []).map((s) => ({
+            shifts: (dayShiftsMap[dayNum] || defaultShifts).map((s) => ({
               startTime: s.startTime,
               endTime: s.endTime,
               slotDurationMinutes: 15,
@@ -403,7 +401,8 @@ export const Appointments: React.FC = () => {
         });
       }
 
-      showToast('Doctor shift schedule saved! 15-minute slots created.');
+      const docName = doctors.find((d) => d.id === targetDocId)?.fullName || 'doctor';
+      showToast(`Time slots confirmed and saved for ${docName}!`);
       setShowScheduleModal(false);
 
       // Refresh slots immediately for current booking view
@@ -416,7 +415,7 @@ export const Appointments: React.FC = () => {
       }
     } catch (err: any) {
       const apiErr = err as ApiError;
-      alert(apiErr.message || 'Failed to save doctor schedules.');
+      alert(apiErr.message || 'Failed to save doctor time slots.');
     } finally {
       setScheduleSaving(false);
     }
@@ -1382,398 +1381,438 @@ export const Appointments: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL 4: DOCTOR SHIFTS & 15-MINUTE SLOTS MANAGER */}
+      {/* MODAL 4: DOCTOR TIME SLOTS SETTINGS (SIMPLIFIED & INTUITIVE) */}
       {showScheduleModal && (
         <div className="modal-backdrop">
-          <div className="modal-content card" style={{ maxWidth: '680px', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div className="modal-content card" style={{ maxWidth: '720px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div className="modal-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                 <Clock size={20} color="#0d9488" />
-                <h3 style={{ margin: 0, fontSize: '1.15rem' }}>Doctor Shifts & 15-Minute Slot Manager</h3>
+                <h3 style={{ margin: 0, fontSize: '1.15rem' }}>Doctor Time Slot Settings</h3>
               </div>
               <button className="modal-close" onClick={() => setShowScheduleModal(false)}>×</button>
             </div>
 
-            <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)', margin: '0.35rem 0 1rem 0' }}>
-              Set daily availability windows (e.g. 1 PM – 5 PM, or multi-shifts like 1–3 PM & 5–9 PM). The system automatically divides each window into 15-minute appointment slots.
-            </p>
-
-            {/* Doctor Picker */}
-            <div style={{ marginBottom: '1.25rem' }}>
-              <label className="form-label" style={{ display: 'block', marginBottom: '0.35rem' }}>
-                Doctor *
+            {/* 1. Doctors in Selectable Rectangles */}
+            <div style={{ marginTop: '0.75rem', marginBottom: '1.25rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.45rem', fontWeight: 600, fontSize: '0.875rem', color: '#1e293b' }}>
+                1. Select Doctor
               </label>
-              {singleCandidateDoctor ? (
-                <div style={{ padding: '0.6rem 0.85rem', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px' }}>
-                  <strong style={{ color: '#166534', fontSize: '0.9rem' }}>{singleCandidateDoctor.fullName}</strong>
-                  <span style={{ fontSize: '0.75rem', color: '#15803d', marginLeft: '0.5rem' }}>
-                    ({singleCandidateDoctor.specialization} • Fee: ${singleCandidateDoctor.consultationFee.toFixed(2)})
-                  </span>
-                </div>
-              ) : (
-                <select
-                  className="input-field"
-                  value={scheduleDoctorId}
-                  onChange={(e) => setScheduleDoctorId(e.target.value)}
-                >
-                  {doctors.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.fullName} ({d.specialization})
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-
-            {/* Scope Toggle: All Days (Mon-Sun) vs Specific Days */}
-            <div style={{ marginBottom: '1.25rem', padding: '0.85rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-              <label className="form-label" style={{ display: 'block', marginBottom: '0.5rem' }}>
-                Schedule Application Scope
-              </label>
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.85rem', cursor: 'pointer', fontWeight: scheduleApplyToAllDays ? 600 : 400, color: scheduleApplyToAllDays ? '#0d9488' : '#334155' }}>
-                  <input
-                    type="radio"
-                    name="scheduleScope"
-                    checked={scheduleApplyToAllDays}
-                    onChange={() => setScheduleApplyToAllDays(true)}
-                  />
-                  Apply to All Days (Monday – Sunday)
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.85rem', cursor: 'pointer', fontWeight: !scheduleApplyToAllDays ? 600 : 400, color: !scheduleApplyToAllDays ? '#0d9488' : '#334155' }}>
-                  <input
-                    type="radio"
-                    name="scheduleScope"
-                    checked={!scheduleApplyToAllDays}
-                    onChange={() => setScheduleApplyToAllDays(false)}
-                  />
-                  Customize Specific Days (e.g. Mon–Sat 1–7 PM, Sun 10–3 PM)
-                </label>
-              </div>
-            </div>
-
-            {/* Quick Presets Bar */}
-            <div style={{ marginBottom: '1.25rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.45rem' }}>
-                <Sparkles size={14} color="#0d9488" />
-                <span style={{ fontSize: '0.785rem', fontWeight: 600, color: '#475569' }}>Quick Presets:</span>
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={() => {
-                    const preset = [{ startTime: '13:00', endTime: '17:00' }];
-                    if (scheduleApplyToAllDays) {
-                      setAllDaysShifts(preset);
-                    } else {
-                      setDayCustomShifts({ ...dayCustomShifts, [activeDayTab]: preset });
-                    }
-                  }}
-                  style={{ fontSize: '0.75rem', padding: '0.25rem 0.55rem' }}
-                >
-                  1 PM – 5 PM (13:00 – 17:00)
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={() => {
-                    const preset = [
-                      { startTime: '13:00', endTime: '15:00' },
-                      { startTime: '17:00', endTime: '21:00' },
-                    ];
-                    if (scheduleApplyToAllDays) {
-                      setAllDaysShifts(preset);
-                    } else {
-                      setDayCustomShifts({ ...dayCustomShifts, [activeDayTab]: preset });
-                    }
-                  }}
-                  style={{ fontSize: '0.75rem', padding: '0.25rem 0.55rem' }}
-                >
-                  1–3 PM & 5–9 PM (Multi-Shift)
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={() => {
-                    const preset = [{ startTime: '13:00', endTime: '19:00' }];
-                    if (scheduleApplyToAllDays) {
-                      setAllDaysShifts(preset);
-                    } else {
-                      setDayCustomShifts({ ...dayCustomShifts, [activeDayTab]: preset });
-                    }
-                  }}
-                  style={{ fontSize: '0.75rem', padding: '0.25rem 0.55rem' }}
-                >
-                  1 PM – 7 PM (13:00 – 19:00)
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={() => {
-                    const preset = [{ startTime: '10:00', endTime: '15:00' }];
-                    if (scheduleApplyToAllDays) {
-                      setAllDaysShifts(preset);
-                    } else {
-                      setDayCustomShifts({ ...dayCustomShifts, [activeDayTab]: preset });
-                    }
-                  }}
-                  style={{ fontSize: '0.75rem', padding: '0.25rem 0.55rem' }}
-                >
-                  10 AM – 3 PM (Sunday Standard)
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={() => {
-                    const preset = [{ startTime: '09:00', endTime: '17:00' }];
-                    if (scheduleApplyToAllDays) {
-                      setAllDaysShifts(preset);
-                    } else {
-                      setDayCustomShifts({ ...dayCustomShifts, [activeDayTab]: preset });
-                    }
-                  }}
-                  style={{ fontSize: '0.75rem', padding: '0.25rem 0.55rem' }}
-                >
-                  9 AM – 5 PM (09:00 – 17:00)
-                </button>
-              </div>
-            </div>
-
-            {/* Custom Days Tab Header (if Customize by Day mode) */}
-            {!scheduleApplyToAllDays && (
-              <div style={{ marginBottom: '1rem' }}>
-                <div style={{ display: 'flex', gap: '0.35rem', overflowX: 'auto', paddingBottom: '0.25rem' }}>
-                  {[
-                    { day: 1, label: 'Mon' },
-                    { day: 2, label: 'Tue' },
-                    { day: 3, label: 'Wed' },
-                    { day: 4, label: 'Thu' },
-                    { day: 5, label: 'Fri' },
-                    { day: 6, label: 'Sat' },
-                    { day: 0, label: 'Sun' },
-                  ].map(({ day, label }) => {
-                    const isTabActive = activeDayTab === day;
-                    const shiftCount = (dayCustomShifts[day] || []).length;
-                    return (
-                      <button
-                        key={day}
-                        type="button"
-                        onClick={() => setActiveDayTab(day)}
-                        className={`btn ${isTabActive ? 'btn-primary' : 'btn-outline'}`}
-                        style={{ fontSize: '0.775rem', padding: '0.35rem 0.65rem', flexShrink: 0 }}
-                      >
-                        {label} ({shiftCount})
-                      </button>
-                    );
-                  })}
-                </div>
-                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={() => {
-                      const monShifts = dayCustomShifts[1] || [{ startTime: '13:00', endTime: '19:00' }];
-                      setDayCustomShifts({
-                        ...dayCustomShifts,
-                        1: [...monShifts],
-                        2: [...monShifts],
-                        3: [...monShifts],
-                        4: [...monShifts],
-                        5: [...monShifts],
-                        6: [...monShifts],
-                      });
-                      toast.info('Applied Monday shifts to Tuesday – Saturday.');
-                    }}
-                    style={{ fontSize: '0.725rem', padding: '0.2rem 0.5rem' }}
-                  >
-                    Copy Mon Shifts to Mon–Sat
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={() => {
-                      setDayCustomShifts({
-                        ...dayCustomShifts,
-                        0: [{ startTime: '10:00', endTime: '15:00' }],
-                      });
-                      toast.info('Sunday set to 10 AM – 3 PM.');
-                    }}
-                    style={{ fontSize: '0.725rem', padding: '0.2rem 0.5rem' }}
-                  >
-                    Set Sunday to 10 AM – 3 PM
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Current Active Shifts Windows Editor */}
-            {(() => {
-              const currentShifts = scheduleApplyToAllDays
-                ? allDaysShifts
-                : dayCustomShifts[activeDayTab] || [];
-
-              const updateShift = (idx: number, field: 'startTime' | 'endTime', val: string) => {
-                if (scheduleApplyToAllDays) {
-                  const copy = [...allDaysShifts];
-                  copy[idx] = { ...copy[idx], [field]: val };
-                  setAllDaysShifts(copy);
-                } else {
-                  const copy = [...(dayCustomShifts[activeDayTab] || [])];
-                  copy[idx] = { ...copy[idx], [field]: val };
-                  setDayCustomShifts({ ...dayCustomShifts, [activeDayTab]: copy });
-                }
-              };
-
-              const removeShift = (idx: number) => {
-                if (scheduleApplyToAllDays) {
-                  setAllDaysShifts(allDaysShifts.filter((_, i) => i !== idx));
-                } else {
-                  const filtered = (dayCustomShifts[activeDayTab] || []).filter((_, i) => i !== idx);
-                  setDayCustomShifts({ ...dayCustomShifts, [activeDayTab]: filtered });
-                }
-              };
-
-              const addShift = () => {
-                const newShift = { startTime: '17:00', endTime: '21:00' };
-                if (scheduleApplyToAllDays) {
-                  setAllDaysShifts([...allDaysShifts, newShift]);
-                } else {
-                  const copy = [...(dayCustomShifts[activeDayTab] || []), newShift];
-                  setDayCustomShifts({ ...dayCustomShifts, [activeDayTab]: copy });
-                }
-              };
-
-              const allPreviewSlots = currentShifts.flatMap((s) => getPreviewSlots(s.startTime, s.endTime, 15));
-
-              return (
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1rem', marginBottom: '1rem', backgroundColor: '#fff' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                    <strong style={{ fontSize: '0.875rem', color: '#0f172a' }}>
-                      {scheduleApplyToAllDays
-                        ? 'All Days (Mon – Sun) Shift Windows'
-                        : `${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][activeDayTab]} Shift Windows`}
-                    </strong>
-                    <button
-                      type="button"
-                      className="btn btn-outline"
-                      onClick={addShift}
-                      style={{ fontSize: '0.75rem', padding: '0.25rem 0.55rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))',
+                  gap: '0.65rem',
+                }}
+              >
+                {doctors.map((d) => {
+                  const isSelected = (scheduleDoctorId || (singleCandidateDoctor?.id || doctors[0]?.id)) === d.id;
+                  return (
+                    <div
+                      key={d.id}
+                      onClick={() => setScheduleDoctorId(d.id)}
+                      style={{
+                        padding: '0.75rem 0.9rem',
+                        borderRadius: '8px',
+                        border: isSelected ? '2px solid #0d9488' : '1px solid #cbd5e1',
+                        backgroundColor: isSelected ? '#f0fdfa' : '#ffffff',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        boxShadow: isSelected ? '0 0 0 1px #0d9488' : 'none',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.25rem',
+                      }}
                     >
-                      <Plus size={13} />
-                      Add Shift Window
-                    </button>
-                  </div>
-
-                  {currentShifts.length === 0 ? (
-                    <div style={{ padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '6px', textAlign: 'center', color: '#64748b', fontSize: '0.8rem' }}>
-                      No shifts configured. Click "Add Shift Window" or choose a Quick Preset above.
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <strong style={{ fontSize: '0.9rem', color: isSelected ? '#0f766e' : '#1e293b' }}>
+                          {d.fullName}
+                        </strong>
+                        {isSelected && <CheckCircle2 size={16} color="#0d9488" />}
+                      </div>
+                      <span style={{ fontSize: '0.75rem', color: isSelected ? '#0d9488' : '#64748b' }}>
+                        {d.specialization}
+                      </span>
                     </div>
-                  ) : (
-                    currentShifts.map((shift, sIdx) => {
-                      const shiftSlots = getPreviewSlots(shift.startTime, shift.endTime, 15);
-                      return (
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 2. Time Slot Selection and Addition (Added to All Days) */}
+            <div style={{ marginBottom: '1.25rem', padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
+                <div>
+                  <strong style={{ fontSize: '0.9rem', color: '#0f172a' }}>2. Time Slots (Added to All Days)</strong>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>
+                    Configure the time slots below. They are automatically added to all days from Monday to Sunday.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => {
+                    const updated = [...defaultShifts, { startTime: '17:00', endTime: '21:00' }];
+                    setDefaultShifts(updated);
+                    const newMap = { ...dayShiftsMap };
+                    [0, 1, 2, 3, 4, 5, 6].forEach((d) => {
+                      if (!customizedDays[d]) newMap[d] = [...updated];
+                    });
+                    setDayShiftsMap(newMap);
+                  }}
+                  style={{ fontSize: '0.75rem', padding: '0.25rem 0.55rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                >
+                  <Plus size={13} />
+                  Add Time Slot
+                </button>
+              </div>
+
+              {/* Quick Presets */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginBottom: '0.75rem' }}>
+                <span style={{ fontSize: '0.75rem', color: '#64748b', alignSelf: 'center', marginRight: '0.2rem' }}>Quick Presets:</span>
+                {[
+                  { label: '1 PM – 5 PM', shifts: [{ startTime: '13:00', endTime: '17:00' }] },
+                  { label: '1–3 PM & 5–9 PM', shifts: [{ startTime: '13:00', endTime: '15:00' }, { startTime: '17:00', endTime: '21:00' }] },
+                  { label: '1 PM – 7 PM', shifts: [{ startTime: '13:00', endTime: '19:00' }] },
+                  { label: '9 AM – 5 PM', shifts: [{ startTime: '09:00', endTime: '17:00' }] },
+                ].map((preset, pIdx) => (
+                  <button
+                    key={pIdx}
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => {
+                      setDefaultShifts(preset.shifts);
+                      const newMap = { ...dayShiftsMap };
+                      [0, 1, 2, 3, 4, 5, 6].forEach((d) => {
+                        if (!customizedDays[d]) newMap[d] = [...preset.shifts];
+                      });
+                      setDayShiftsMap(newMap);
+                    }}
+                    style={{ fontSize: '0.725rem', padding: '0.2rem 0.5rem' }}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Time Slot Rows */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {defaultShifts.map((shift, sIdx) => (
+                  <div
+                    key={sIdx}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.65rem',
+                      padding: '0.5rem 0.75rem',
+                      backgroundColor: '#ffffff',
+                      borderRadius: '6px',
+                      border: '1px solid #cbd5e1',
+                    }}
+                  >
+                    <span style={{ fontSize: '0.775rem', fontWeight: 600, color: '#475569', minWidth: '40px' }}>
+                      Slot {sIdx + 1}:
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>From</span>
+                      <input
+                        type="time"
+                        className="input-field"
+                        value={shift.startTime}
+                        onChange={(e) => {
+                          const updated = [...defaultShifts];
+                          updated[sIdx] = { ...updated[sIdx], startTime: e.target.value };
+                          setDefaultShifts(updated);
+                          const newMap = { ...dayShiftsMap };
+                          [0, 1, 2, 3, 4, 5, 6].forEach((d) => {
+                            if (!customizedDays[d]) newMap[d] = [...updated];
+                          });
+                          setDayShiftsMap(newMap);
+                        }}
+                        style={{ padding: '0.3rem 0.5rem', fontSize: '0.8rem', width: '105px' }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>To</span>
+                      <input
+                        type="time"
+                        className="input-field"
+                        value={shift.endTime}
+                        onChange={(e) => {
+                          const updated = [...defaultShifts];
+                          updated[sIdx] = { ...updated[sIdx], endTime: e.target.value };
+                          setDefaultShifts(updated);
+                          const newMap = { ...dayShiftsMap };
+                          [0, 1, 2, 3, 4, 5, 6].forEach((d) => {
+                            if (!customizedDays[d]) newMap[d] = [...updated];
+                          });
+                          setDayShiftsMap(newMap);
+                        }}
+                        style={{ padding: '0.3rem 0.5rem', fontSize: '0.8rem', width: '105px' }}
+                      />
+                    </div>
+                    <span style={{ fontSize: '0.775rem', fontWeight: 600, color: '#0d9488', marginLeft: 'auto' }}>
+                      {formatTime12h(shift.startTime)} – {formatTime12h(shift.endTime)}
+                    </span>
+                    {defaultShifts.length > 1 && (
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={() => {
+                          const updated = defaultShifts.filter((_, i) => i !== sIdx);
+                          setDefaultShifts(updated);
+                          const newMap = { ...dayShiftsMap };
+                          [0, 1, 2, 3, 4, 5, 6].forEach((d) => {
+                            if (!customizedDays[d]) newMap[d] = [...updated];
+                          });
+                          setDayShiftsMap(newMap);
+                        }}
+                        style={{ fontSize: '0.75rem', padding: '0.15rem 0.4rem', color: '#dc2626', borderColor: '#fca5a5' }}
+                        title="Remove time slot"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 3. Days from Mon – Sun with Assigned Time Slots */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem' }}>
+                <label style={{ margin: 0, fontWeight: 600, fontSize: '0.875rem', color: '#1e293b' }}>
+                  3. Days Overview (Monday – Sunday)
+                </label>
+                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                  Click any day to change its time slots
+                </span>
+              </div>
+
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+                  gap: '0.55rem',
+                }}
+              >
+                {[
+                  { dayNum: 1, name: 'Monday' },
+                  { dayNum: 2, name: 'Tuesday' },
+                  { dayNum: 3, name: 'Wednesday' },
+                  { dayNum: 4, name: 'Thursday' },
+                  { dayNum: 5, name: 'Friday' },
+                  { dayNum: 6, name: 'Saturday' },
+                  { dayNum: 0, name: 'Sunday' },
+                ].map((d) => {
+                  const isDayEditing = selectedEditDay === d.dayNum;
+                  const isCustom = customizedDays[d.dayNum];
+                  const dayShifts = dayShiftsMap[d.dayNum] || defaultShifts;
+                  return (
+                    <div
+                      key={d.dayNum}
+                      onClick={() => setSelectedEditDay(isDayEditing ? null : d.dayNum)}
+                      style={{
+                        padding: '0.65rem 0.75rem',
+                        borderRadius: '8px',
+                        border: isDayEditing
+                          ? '2px solid #0d9488'
+                          : isCustom
+                          ? '1px solid #0d9488'
+                          : '1px solid #cbd5e1',
+                        backgroundColor: isDayEditing
+                          ? '#f0fdfa'
+                          : isCustom
+                          ? '#f8fafc'
+                          : '#ffffff',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.3rem',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <strong style={{ fontSize: '0.85rem', color: isDayEditing ? '#0f766e' : '#0f172a' }}>
+                          {d.name}
+                        </strong>
+                        {isCustom ? (
+                          <span style={{ fontSize: '0.675rem', color: '#0d9488', backgroundColor: '#ccfbf1', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: 600 }}>
+                            Custom
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: '0.675rem', color: '#64748b' }}>
+                            All Days
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#334155', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        {dayShifts.map((s, idx) => (
+                          <div key={idx} style={{ fontWeight: 500 }}>
+                            {formatTime12h(s.startTime)} – {formatTime12h(s.endTime)}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Day-Specific Edit Box (Shown when a day is clicked) */}
+              {selectedEditDay !== null && (() => {
+                const dayNum = selectedEditDay;
+                const dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dayNum];
+                const currentDayShifts = dayShiftsMap[dayNum] || [...defaultShifts];
+
+                const updateDayShift = (sIdx: number, field: 'startTime' | 'endTime', val: string) => {
+                  const copy = [...currentDayShifts];
+                  copy[sIdx] = { ...copy[sIdx], [field]: val };
+                  setDayShiftsMap({ ...dayShiftsMap, [dayNum]: copy });
+                  setCustomizedDays({ ...customizedDays, [dayNum]: true });
+                };
+
+                const removeDayShift = (sIdx: number) => {
+                  const filtered = currentDayShifts.filter((_, i) => i !== sIdx);
+                  setDayShiftsMap({ ...dayShiftsMap, [dayNum]: filtered });
+                  setCustomizedDays({ ...customizedDays, [dayNum]: true });
+                };
+
+                const addDayShift = () => {
+                  const updated = [...currentDayShifts, { startTime: '17:00', endTime: '21:00' }];
+                  setDayShiftsMap({ ...dayShiftsMap, [dayNum]: updated });
+                  setCustomizedDays({ ...customizedDays, [dayNum]: true });
+                };
+
+                const resetToDefault = () => {
+                  setDayShiftsMap({ ...dayShiftsMap, [dayNum]: [...defaultShifts] });
+                  const customCopy = { ...customizedDays };
+                  delete customCopy[dayNum];
+                  setCustomizedDays(customCopy);
+                };
+
+                return (
+                  <div
+                    style={{
+                      marginTop: '0.75rem',
+                      padding: '0.85rem 1rem',
+                      backgroundColor: '#f0fdfa',
+                      borderRadius: '8px',
+                      border: '1px solid #99f6e4',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
+                      <div>
+                        <strong style={{ fontSize: '0.875rem', color: '#0f766e' }}>
+                          Customizing {dayName} Time Slots
+                        </strong>
+                        <span style={{ fontSize: '0.75rem', color: '#14b8a6', marginLeft: '0.5rem' }}>
+                          (Affects only {dayName})
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.4rem' }}>
+                        {dayNum === 0 && (
+                          <button
+                            type="button"
+                            className="btn btn-outline"
+                            onClick={() => {
+                              setDayShiftsMap({
+                                ...dayShiftsMap,
+                                0: [{ startTime: '10:00', endTime: '15:00' }],
+                              });
+                              setCustomizedDays({ ...customizedDays, 0: true });
+                            }}
+                            style={{ fontSize: '0.725rem', padding: '0.2rem 0.5rem', backgroundColor: '#fff' }}
+                          >
+                            Set Sunday 10 AM – 3 PM
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          onClick={resetToDefault}
+                          style={{ fontSize: '0.725rem', padding: '0.2rem 0.5rem', backgroundColor: '#fff' }}
+                        >
+                          Reset to All Days Default
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          onClick={addDayShift}
+                          style={{ fontSize: '0.725rem', padding: '0.2rem 0.5rem', backgroundColor: '#fff' }}
+                        >
+                          + Add Slot
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          onClick={() => setSelectedEditDay(null)}
+                          style={{ fontSize: '0.725rem', padding: '0.2rem 0.45rem', backgroundColor: '#fff' }}
+                        >
+                          Done
+                        </button>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                      {currentDayShifts.map((shift, sIdx) => (
                         <div
                           key={sIdx}
                           style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '0.75rem',
-                            marginBottom: '0.75rem',
-                            padding: '0.65rem 0.85rem',
-                            backgroundColor: '#f8fafc',
+                            gap: '0.65rem',
+                            padding: '0.45rem 0.7rem',
+                            backgroundColor: '#ffffff',
                             borderRadius: '6px',
-                            border: '1px solid #e2e8f0',
+                            border: '1px solid #ccfbf1',
                           }}
                         >
-                          <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', minWidth: '45px' }}>
-                            Shift {sIdx + 1}
+                          <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#0f766e', minWidth: '40px' }}>
+                            Slot {sIdx + 1}:
                           </span>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>From:</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>From</span>
                             <input
                               type="time"
                               className="input-field"
                               value={shift.startTime}
-                              onChange={(e) => updateShift(sIdx, 'startTime', e.target.value)}
-                              style={{ padding: '0.3rem 0.5rem', fontSize: '0.8rem', width: '110px' }}
-                              required
+                              onChange={(e) => updateDayShift(sIdx, 'startTime', e.target.value)}
+                              style={{ padding: '0.25rem 0.45rem', fontSize: '0.8rem', width: '105px' }}
                             />
                           </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>To:</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>To</span>
                             <input
                               type="time"
                               className="input-field"
                               value={shift.endTime}
-                              onChange={(e) => updateShift(sIdx, 'endTime', e.target.value)}
-                              style={{ padding: '0.3rem 0.5rem', fontSize: '0.8rem', width: '110px' }}
-                              required
+                              onChange={(e) => updateDayShift(sIdx, 'endTime', e.target.value)}
+                              style={{ padding: '0.25rem 0.45rem', fontSize: '0.8rem', width: '105px' }}
                             />
                           </div>
-                          <span style={{ fontSize: '0.75rem', color: '#0d9488', fontWeight: 600, marginLeft: 'auto' }}>
-                            {shiftSlots.length} slots (15 min each)
+                          <span style={{ fontSize: '0.775rem', fontWeight: 600, color: '#0d9488', marginLeft: 'auto' }}>
+                            {formatTime12h(shift.startTime)} – {formatTime12h(shift.endTime)}
                           </span>
-                          <button
-                            type="button"
-                            className="btn btn-outline"
-                            onClick={() => removeShift(sIdx)}
-                            style={{ fontSize: '0.75rem', padding: '0.25rem 0.45rem', color: '#dc2626', borderColor: '#fca5a5' }}
-                            title="Remove this shift window"
-                          >
-                            ×
-                          </button>
+                          {currentDayShifts.length > 1 && (
+                            <button
+                              type="button"
+                              className="btn btn-outline"
+                              onClick={() => removeDayShift(sIdx)}
+                              style={{ fontSize: '0.75rem', padding: '0.15rem 0.4rem', color: '#dc2626', borderColor: '#fca5a5' }}
+                            >
+                              ×
+                            </button>
+                          )}
                         </div>
-                      );
-                    })
-                  )}
-
-                  {/* Visual 15-Minute Generated Slots Preview */}
-                  {allPreviewSlots.length > 0 && (
-                    <div style={{ marginTop: '0.85rem', paddingTop: '0.85rem', borderTop: '1px solid #e2e8f0' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#334155' }}>
-                          Auto-Generated 15-Minute Slots Preview ({allPreviewSlots.length} slots total):
-                        </span>
-                      </div>
-                      <div
-                        style={{
-                          display: 'flex',
-                          flexWrap: 'wrap',
-                          gap: '0.35rem',
-                          maxHeight: '110px',
-                          overflowY: 'auto',
-                          padding: '0.4rem',
-                          backgroundColor: '#f0fdf4',
-                          border: '1px solid #bbf7d0',
-                          borderRadius: '6px',
-                        }}
-                      >
-                        {allPreviewSlots.map((timeStr, tIdx) => (
-                          <span
-                            key={tIdx}
-                            style={{
-                              fontSize: '0.725rem',
-                              fontWeight: 600,
-                              color: '#166534',
-                              backgroundColor: '#ffffff',
-                              padding: '0.2rem 0.45rem',
-                              borderRadius: '4px',
-                              border: '1px solid #86efac',
-                            }}
-                          >
-                            {timeStr}
-                          </span>
-                        ))}
-                      </div>
+                      ))}
                     </div>
-                  )}
-                </div>
-              );
-            })()}
+                  </div>
+                );
+              })()}
+            </div>
 
-            {/* Modal Actions */}
-            <div className="modal-actions">
+            {/* 4. Confirm Button */}
+            <div className="modal-actions" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0' }}>
               <button
                 type="button"
                 className="btn btn-outline"
@@ -1787,13 +1826,14 @@ export const Appointments: React.FC = () => {
                 className="btn btn-primary"
                 onClick={handleSaveDoctorSchedules}
                 disabled={scheduleSaving}
+                style={{ padding: '0.55rem 1.35rem', fontWeight: 600 }}
               >
                 {scheduleSaving ? (
                   <span className="btn-loading">
-                    <RefreshCw size={14} className="spin" /> Saving Shifts...
+                    <RefreshCw size={14} className="spin" /> Saving Time Slots...
                   </span>
                 ) : (
-                  'Save Doctor Shifts & 15-Minute Slots'
+                  'Confirm & Save Time Slots'
                 )}
               </button>
             </div>
