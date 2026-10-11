@@ -6,6 +6,7 @@ import {
   UserX,
   Activity,
   CheckCircle2,
+  Circle,
   AlertCircle,
   Search,
   Plus,
@@ -319,7 +320,7 @@ export const Appointments: React.FC = () => {
       if (selectedStatusTab === 'waiting') statusFilter = 3; // Waiting
       else if (selectedStatusTab === 'booked') statusFilter = 0; // Booked
       else if (selectedStatusTab === 'in-consult') statusFilter = 4; // InConsultation
-      else if (selectedStatusTab === 'completed') statusFilter = 5; // Completed
+      else if (selectedStatusTab === 'completed' || selectedStatusTab === 'done') statusFilter = 5; // Completed / Done
       else if (selectedStatusTab === 'cancelled') statusFilter = 6; // Cancelled
 
       const [res, sum] = await Promise.all([
@@ -334,7 +335,11 @@ export const Appointments: React.FC = () => {
         api.getQueueSummary(selectedDate || undefined, selectedDoctorId || undefined),
       ]);
 
-      setAppointments(res.items);
+      if (selectedStatusTab === 'not-done') {
+        setAppointments(res.items.filter((a) => a.status !== 5 && a.status !== 6));
+      } else {
+        setAppointments(res.items);
+      }
       setSummary(sum);
     } catch (err: any) {
       const apiErr = err as ApiError;
@@ -427,6 +432,24 @@ export const Appointments: React.FC = () => {
     } catch (err: any) {
       const apiErr = err as ApiError;
       alert(apiErr.message || 'Failed to update status.');
+    }
+  };
+
+  const handleToggleDone = async (appt: AppointmentDto) => {
+    setActionLoading(true);
+    try {
+      const nextStatus: AppointmentStatus = appt.status === 5 ? 0 : 5;
+      const note = appt.status === 5
+        ? 'Reopened appointment (Marked as Not Done)'
+        : 'Appointment attended and completed (Marked as Done)';
+      await api.updateAppointmentStatus(appt.id, nextStatus, note);
+      showToast(appt.status === 5 ? `Appointment marked as Not Done.` : `Appointment marked as Done! ✓`);
+      fetchAppointments();
+    } catch (err: any) {
+      const apiErr = err as ApiError;
+      alert(apiErr.message || 'Failed to update appointment status.');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -824,13 +847,14 @@ export const Appointments: React.FC = () => {
         </div>
 
         {/* Status Filter Tabs */}
-        <div style={{ display: 'flex', gap: '0.4rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.6rem', marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', gap: '0.4rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.6rem', marginBottom: '1rem', overflowX: 'auto' }}>
           {[
-            { id: 'all', label: 'All Appointments' },
+            { id: 'all', label: `All Appointments (${summary?.totalToday ?? 0})` },
+            { id: 'done', label: `✓ Done (${summary?.completed ?? 0})` },
+            { id: 'not-done', label: `Not Done (${Math.max(0, (summary?.totalToday ?? 0) - (summary?.completed ?? 0))})` },
             { id: 'waiting', label: `Arrival Queue (${summary?.waiting ?? 0})` },
             { id: 'booked', label: `Scheduled (${summary?.booked ?? 0})` },
             { id: 'in-consult', label: `In Consultation (${summary?.inConsultation ?? 0})` },
-            { id: 'completed', label: `Completed (${summary?.completed ?? 0})` },
             { id: 'cancelled', label: 'Cancelled' },
           ].map((tab) => (
             <button
@@ -846,6 +870,7 @@ export const Appointments: React.FC = () => {
                 backgroundColor: selectedStatusTab === tab.id ? 'var(--primary)' : 'transparent',
                 color: selectedStatusTab === tab.id ? '#fff' : '#64748b',
                 transition: 'all 0.15s ease',
+                whiteSpace: 'nowrap',
               }}
             >
               {tab.label}
@@ -862,6 +887,7 @@ export const Appointments: React.FC = () => {
                 <th style={{ width: '130px' }}>Appt #</th>
                 <th>Patient</th>
                 <th>Physician & Dept</th>
+                <th style={{ width: '130px', textAlign: 'center' }}>Attended / Done</th>
                 <th>Status</th>
                 <th>Reason</th>
                 <th style={{ textAlign: 'right' }}>Actions</th>
@@ -870,14 +896,14 @@ export const Appointments: React.FC = () => {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', padding: '2rem' }}>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '2rem' }}>
                     <RefreshCw size={20} className="spin" color="var(--primary)" style={{ margin: '0 auto 0.5rem auto' }} />
                     <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Loading clinic appointments...</span>
                   </td>
                 </tr>
               ) : appointments.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
                     <CalendarIcon size={32} color="#cbd5e1" style={{ margin: '0 auto 0.5rem auto' }} />
                     <p style={{ margin: 0, fontWeight: 500 }}>No appointments found for the selected criteria.</p>
                     <p style={{ fontSize: '0.75rem', marginTop: '0.2rem' }}>Click "Book Appointment" to schedule a patient visit.</p>
@@ -908,6 +934,62 @@ export const Appointments: React.FC = () => {
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                         {a.departmentName || a.specialization}
                       </div>
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      {a.status === 5 ? (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleDone(a)}
+                          disabled={actionLoading}
+                          className="btn"
+                          title="Appointment is Done (Completed). Click check mark to mark as Not Done"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.35rem',
+                            padding: '0.3rem 0.7rem',
+                            fontSize: '0.78rem',
+                            fontWeight: 600,
+                            backgroundColor: '#dcfce7',
+                            color: '#15803d',
+                            border: '1.5px solid #86efac',
+                            borderRadius: '20px',
+                            cursor: 'pointer',
+                            boxShadow: '0 1px 2px rgba(22, 163, 74, 0.12)',
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          <CheckCircle2 size={16} color="#16a34a" />
+                          <span>Done</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleDone(a)}
+                          disabled={actionLoading}
+                          className="btn"
+                          title="Appointment Not Done yet. Click check mark to mark as Done"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.35rem',
+                            padding: '0.3rem 0.7rem',
+                            fontSize: '0.78rem',
+                            fontWeight: 500,
+                            backgroundColor: '#f8fafc',
+                            color: '#64748b',
+                            border: '1.5px dashed #cbd5e1',
+                            borderRadius: '20px',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          <Circle size={15} color="#94a3b8" />
+                          <span>Not Done</span>
+                        </button>
+                      )}
                     </td>
                     <td>{getStatusBadge(a.status)}</td>
                     <td style={{ maxWidth: '200px' }}>
@@ -1006,6 +1088,19 @@ export const Appointments: React.FC = () => {
                           >
                             <FileText size={12} />
                             Clinical
+                          </button>
+                        )}
+
+                        {/* Reopen Button (if completed) */}
+                        {a.status === 5 && (
+                          <button
+                            className="btn btn-outline"
+                            onClick={() => handleToggleDone(a)}
+                            disabled={actionLoading}
+                            style={{ fontSize: '0.725rem', padding: '0.25rem 0.5rem', color: '#64748b' }}
+                            title="Reopen appointment (Mark as Not Done)"
+                          >
+                            Reopen
                           </button>
                         )}
 

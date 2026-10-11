@@ -18,4 +18,5 @@ public interface ISystemService
 
     Task<SystemInfoDto> GetSystemInfoAsync(CancellationToken cancellationToken = default);
     Task<string> RunMaintenanceAsync(Guid actorUserId, CancellationToken cancellationToken = default);
+    Task<string> PurgeClinicalDataAsync(Guid actorUserId, CancellationToken cancellationToken = default);
 }

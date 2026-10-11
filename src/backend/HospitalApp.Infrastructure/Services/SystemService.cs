@@ -584,4 +584,50 @@ public class SystemService : ISystemService
 
         await File.WriteAllTextAsync(destinationPath, sb.ToString(), Encoding.UTF8, cancellationToken);
     }
+
+    public async Task<string> PurgeClinicalDataAsync(Guid actorUserId, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Purging all clinical data, dummy patients, appointments, encounters, prescriptions, lab orders, and invoices...");
+
+        // Remove child records first to satisfy foreign key constraints
+        _context.Refunds.RemoveRange(_context.Refunds);
+        _context.Payments.RemoveRange(_context.Payments);
+        _context.InvoiceLines.RemoveRange(_context.InvoiceLines);
+        _context.Invoices.RemoveRange(_context.Invoices);
+
+        _context.DispenseItems.RemoveRange(_context.DispenseItems);
+        _context.DispenseRecords.RemoveRange(_context.DispenseRecords);
+        _context.PrescriptionItems.RemoveRange(_context.PrescriptionItems);
+        _context.Prescriptions.RemoveRange(_context.Prescriptions);
+
+        _context.LabOrderItems.RemoveRange(_context.LabOrderItems);
+        _context.LabOrders.RemoveRange(_context.LabOrders);
+
+        _context.Diagnoses.RemoveRange(_context.Diagnoses);
+        _context.ClinicalNotes.RemoveRange(_context.ClinicalNotes);
+        _context.VitalSigns.RemoveRange(_context.VitalSigns);
+        _context.Encounters.RemoveRange(_context.Encounters);
+
+        _context.Appointments.RemoveRange(_context.Appointments);
+
+        _context.PatientAllergies.RemoveRange(_context.PatientAllergies);
+        _context.PatientConditions.RemoveRange(_context.PatientConditions);
+        _context.Documents.RemoveRange(_context.Documents);
+
+        _context.Patients.RemoveRange(_context.Patients);
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        await _auditService.LogAsync(
+            actorUserId,
+            "SystemAdmin",
+            "ClinicalData.Purge",
+            "System",
+            "All",
+            "Purged all dummy patient records and clinical/operational transactions.",
+            "127.0.0.1");
+
+        _logger.LogInformation("Successfully purged all clinical dummy data and patients.");
+        return "All dummy patients and clinical records have been purged successfully.";
+    }
 }

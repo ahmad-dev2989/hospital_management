@@ -185,4 +185,21 @@ public class SystemController : ControllerBase
             return StatusCode(500, new { error = new { code = "MAINTENANCE_ERROR", message = ex.Message } });
         }
     }
+
+    [HttpPost("purge-clinical-data")]
+    [Authorize(Roles = "SystemAdministrator,HospitalAdministrator")]
+    public async Task<IActionResult> PurgeClinicalData(CancellationToken cancellationToken)
+    {
+        var (userId, _) = GetCurrentUser();
+        try
+        {
+            var message = await _systemService.PurgeClinicalDataAsync(userId, cancellationToken);
+            return Ok(new { message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to purge clinical dummy data.");
+            return StatusCode(500, new { error = new { code = "PURGE_ERROR", message = ex.Message } });
+        }
+    }
 }
