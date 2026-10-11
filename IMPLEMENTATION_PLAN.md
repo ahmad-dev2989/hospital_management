@@ -27,8 +27,8 @@ This implementation plan tracks the lifecycle, phase progress, and module status
 | **Phase 9** | Billing & Payments | **Tested** | Service catalog, invoice generation, payment capture, idempotent transactions, receipts, refunds, shift close. |
 | **Phase 10** | Reports & Dashboard | **Tested** | Real-time database metrics, financial reconciliation, clinical turnaround, appointment stats, data export. |
 | **Phase 11** | Local Documents & Backup | **Tested** | Secure local storage, SHA-256 deduplication, automated pg_dump backup schedule, restore verification. |
-| **Phase 12** | Integration & UX Polish | **Not started** | Cross-module navigation, responsive desktop layouts, error toast handling, keyboard accessibility. |
-| **Phase 13** | Security, Reliability & Performance | **Not started** | Concurrency tests (slot double-booking, stock race conditions), load validation, security audit. |
+| **Phase 12** | Integration & UX Polish | **Tested** | Cross-module navigation, responsive desktop layouts, error toast handling, keyboard accessibility. |
+| **Phase 13** | Security, Reliability & Performance | **Tested** | Concurrency tests (slot double-booking, stock race conditions), load validation, security audit. |
 | **Phase 14** | Desktop Packaging & Installation | **Not started** | Self-contained Windows desktop package, bundled PostgreSQL runner, zero-dev manual startup. |
 | **Phase 15** | Final Acceptance | **Not started** | Clean install test, disaster recovery drill, end-to-end clinical & financial acceptance sign-off. |
 
@@ -122,6 +122,15 @@ This implementation plan tracks the lifecycle, phase progress, and module status
 - [x] Collapsible desktop sidebar mode (compact 68px icon navigation) — **Tested**
 - [x] Persistent Active Patient indicator pill with 1-click context clear in top header — **Tested**
 - [x] Complete thermal/laser print stylesheet (`@media print`) for invoices, prescriptions, barcodes, and reports — **Tested**
+
+### Module L: Security, Reliability & Performance (Phase 13)
+- [x] Automated concurrency testing for appointment slot double-booking (SemaphoreSlim + conflict detection) — **Tested**
+- [x] Automated concurrency testing for pharmacy FEFO stock dispensing (prevents negative inventory / race conditions) — **Tested**
+- [x] Automated concurrency testing for idempotent payment capture (prevents double charging) — **Tested**
+- [x] RBAC security policy reflection audit across sensitive controllers & endpoints — **Tested**
+- [x] Account lockout validation (5 failed consecutive attempts, 15m lockout, lockout release) — **Tested**
+- [x] Local document storage path traversal attack prevention & filename sanitization — **Tested**
+- [x] High-throughput compound database stress testing under local loopback SLA (< 250ms) — **Tested**
 
 ---
 
