@@ -845,6 +845,129 @@ class ApiClient {
       body: JSON.stringify(data),
     });
   }
+
+  // Module G (Billing & Payments) API Methods
+  async getBillingMetrics(): Promise<BillingDashboardMetricsDto> {
+    return this.request<BillingDashboardMetricsDto>('/billing/metrics');
+  }
+
+  async getServices(params?: {
+    query?: string;
+    category?: string;
+    activeOnly?: boolean;
+  }): Promise<ServiceItemDto[]> {
+    const searchParams = new URLSearchParams();
+    if (params?.query) searchParams.append('query', params.query);
+    if (params?.category) searchParams.append('category', params.category);
+    if (params?.activeOnly !== undefined) searchParams.append('activeOnly', params.activeOnly.toString());
+
+    const qs = searchParams.toString();
+    return this.request<ServiceItemDto[]>(`/billing/services${qs ? `?${qs}` : ''}`);
+  }
+
+  async getServiceById(id: string): Promise<ServiceItemDto> {
+    return this.request<ServiceItemDto>(`/billing/services/${id}`);
+  }
+
+  async createService(data: CreateServiceItemRequest): Promise<ServiceItemDto> {
+    return this.request<ServiceItemDto>('/billing/services', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateService(id: string, data: UpdateServiceItemRequest): Promise<ServiceItemDto> {
+    return this.request<ServiceItemDto>(`/billing/services/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getInvoices(params?: {
+    patientId?: string;
+    status?: InvoiceStatus;
+    query?: string;
+    fromDate?: string;
+    toDate?: string;
+    page?: number;
+    pageSize?: number;
+  }): Promise<PagedResult<InvoiceDto>> {
+    const searchParams = new URLSearchParams();
+    if (params?.patientId) searchParams.append('patientId', params.patientId);
+    if (params?.status !== undefined) searchParams.append('status', params.status.toString());
+    if (params?.query) searchParams.append('query', params.query);
+    if (params?.fromDate) searchParams.append('fromDate', params.fromDate);
+    if (params?.toDate) searchParams.append('toDate', params.toDate);
+    if (params?.page) searchParams.append('page', params.page.toString());
+    if (params?.pageSize) searchParams.append('pageSize', params.pageSize.toString());
+
+    const qs = searchParams.toString();
+    return this.request<PagedResult<InvoiceDto>>(`/billing/invoices${qs ? `?${qs}` : ''}`);
+  }
+
+  async getInvoiceById(id: string): Promise<InvoiceDto> {
+    return this.request<InvoiceDto>(`/billing/invoices/${id}`);
+  }
+
+  async createInvoice(data: CreateInvoiceRequest): Promise<InvoiceDto> {
+    return this.request<InvoiceDto>('/billing/invoices', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async generateInvoiceFromEncounter(
+    encounterId: string,
+    data?: GenerateEncounterInvoiceRequest
+  ): Promise<InvoiceDto> {
+    return this.request<InvoiceDto>(`/billing/invoices/generate-from-encounter/${encounterId}`, {
+      method: 'POST',
+      body: JSON.stringify(data || { discount: 0, taxPercentage: 0 }),
+    });
+  }
+
+  async issueInvoice(id: string): Promise<InvoiceDto> {
+    return this.request<InvoiceDto>(`/billing/invoices/${id}/issue`, {
+      method: 'POST',
+    });
+  }
+
+  async voidInvoice(id: string, reason: string): Promise<InvoiceDto> {
+    return this.request<InvoiceDto>(`/billing/invoices/${id}/void`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+  }
+
+  async recordPayment(data: RecordPaymentRequest): Promise<PaymentDto> {
+    return this.request<PaymentDto>('/billing/payments', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getPaymentById(id: string): Promise<PaymentDto> {
+    return this.request<PaymentDto>(`/billing/payments/${id}`);
+  }
+
+  async processRefund(id: string, data: ProcessRefundRequest): Promise<RefundDto> {
+    return this.request<RefundDto>(`/billing/payments/${id}/refund`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getCashierShiftSummary(params?: {
+    date?: string;
+    cashierUserId?: string;
+  }): Promise<CashierShiftSummaryDto> {
+    const searchParams = new URLSearchParams();
+    if (params?.date) searchParams.append('date', params.date);
+    if (params?.cashierUserId) searchParams.append('cashierUserId', params.cashierUserId);
+
+    const qs = searchParams.toString();
+    return this.request<CashierShiftSummaryDto>(`/billing/cashier-shift/summary${qs ? `?${qs}` : ''}`);
+  }
 }
 
 // Module C (Appointments & Scheduling) Interfaces
@@ -1531,6 +1654,190 @@ export interface PharmacyDashboardMetricsDto {
   expiredBatchesCount: number;
   pendingPrescriptionsCount: number;
   dispensedTodayCount: number;
+}
+
+// Module G (Billing & Payments) Interfaces
+export type InvoiceStatus =
+  | 0 // Draft
+  | 1 // Issued
+  | 2 // PartiallyPaid
+  | 3 // Paid
+  | 4 // Voided
+  | 5 // RefundedPartially
+  | 6; // RefundedFully
+
+export const INVOICE_STATUS_NAMES: Record<InvoiceStatus, string> = {
+  0: 'Draft',
+  1: 'Issued',
+  2: 'Partially Paid',
+  3: 'Fully Paid',
+  4: 'Voided',
+  5: 'Partially Refunded',
+  6: 'Fully Refunded',
+};
+
+export type PaymentMethod =
+  | 0 // Cash
+  | 1 // CreditCard
+  | 2 // DebitCard
+  | 3 // BankTransfer
+  | 4 // MobilePayment
+  | 5; // InsuranceCoPay
+
+export const PAYMENT_METHOD_NAMES: Record<PaymentMethod, string> = {
+  0: 'Cash',
+  1: 'Credit Card',
+  2: 'Debit Card',
+  3: 'Bank Transfer',
+  4: 'Mobile Payment',
+  5: 'Insurance / Co-Pay',
+};
+
+export interface ServiceItemDto {
+  id: string;
+  code: string;
+  name: string;
+  category: string;
+  defaultPrice: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateServiceItemRequest {
+  code: string;
+  name: string;
+  category: string;
+  defaultPrice: number;
+}
+
+export interface UpdateServiceItemRequest {
+  name: string;
+  category: string;
+  defaultPrice: number;
+  isActive: boolean;
+}
+
+export interface InvoiceLineDto {
+  id: string;
+  invoiceId: string;
+  sourceType: string;
+  sourceId: string;
+  itemDescription: string;
+  quantity: number;
+  unitPriceSnapshot: number;
+  totalPrice: number;
+  createdAt: string;
+}
+
+export interface CreateInvoiceLineRequest {
+  sourceType?: string;
+  sourceId?: string;
+  itemDescription: string;
+  quantity: number;
+  unitPrice: number;
+}
+
+export interface InvoiceDto {
+  id: string;
+  invoiceNumber: string;
+  patientId: string;
+  patientNumber: string;
+  patientName: string;
+  encounterId?: string;
+  encounterNumber?: string;
+  createdByUserId: string;
+  createdByUserName: string;
+  issuedAt: string;
+  subtotal: number;
+  discount: number;
+  tax: number;
+  total: number;
+  paidAmount: number;
+  balance: number;
+  status: InvoiceStatus;
+  createdAt: string;
+  updatedAt: string;
+  lines: InvoiceLineDto[];
+  payments: PaymentDto[];
+}
+
+export interface CreateInvoiceRequest {
+  patientId: string;
+  encounterId?: string;
+  discount: number;
+  taxPercentage: number;
+  lines: CreateInvoiceLineRequest[];
+}
+
+export interface GenerateEncounterInvoiceRequest {
+  discount: number;
+  taxPercentage: number;
+}
+
+export interface PaymentDto {
+  id: string;
+  receiptNumber: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  cashierUserId: string;
+  cashierUserName: string;
+  amount: number;
+  method: PaymentMethod;
+  providerReference?: string;
+  idempotencyKey: string;
+  receivedAt: string;
+  createdAt: string;
+  refunds: RefundDto[];
+}
+
+export interface RecordPaymentRequest {
+  invoiceId: string;
+  amount: number;
+  method: PaymentMethod;
+  providerReference?: string;
+  idempotencyKey: string;
+}
+
+export interface RefundDto {
+  id: string;
+  paymentId: string;
+  authorizedByUserId: string;
+  authorizedByUserName: string;
+  amount: number;
+  reason: string;
+  refundedAt: string;
+  createdAt: string;
+}
+
+export interface ProcessRefundRequest {
+  amount: number;
+  reason: string;
+}
+
+export interface CashierShiftSummaryDto {
+  shiftDate: string;
+  cashierUserId?: string;
+  cashierUserName?: string;
+  totalCollected: number;
+  totalRefunded: number;
+  netCollected: number;
+  totalReceiptsCount: number;
+  cashTotal: number;
+  creditCardTotal: number;
+  debitCardTotal: number;
+  bankTransferTotal: number;
+  mobilePaymentTotal: number;
+  insuranceCoPayTotal: number;
+  recentPayments: PaymentDto[];
+}
+
+export interface BillingDashboardMetricsDto {
+  todayRevenue: number;
+  totalOutstandingBalance: number;
+  pendingInvoicesCount: number;
+  totalPaidInvoicesCount: number;
+  activeServicesCount: number;
 }
 
 export const api = new ApiClient();

@@ -87,13 +87,13 @@ This implementation plan tracks the lifecycle, phase progress, and module status
 - [x] Low stock & expiring batch alerts with printable medication labels — **Tested**
 
 ### Module G: Billing & Payments
-- [x] ServiceItem, Invoice, InvoiceLine, Payment, Refund schema — **Implemented**
-- [ ] Service catalog & fee schedules — **Not started**
-- [ ] Automated invoice line generation from clinical orders & pharmacy dispensing — **Not started**
-- [ ] Decimal monetary calculations (zero floating-point arithmetic) — **Not started**
-- [ ] Payment capture with idempotency keys & sequential receipt numbering — **Not started**
-- [ ] Refund requests with supervisor approval workflow — **Not started**
-- [ ] Daily cashier shift closing & cash reconciliation — **Not started**
+- [x] ServiceItem, Invoice, InvoiceLine, Payment, Refund schema — **Tested**
+- [x] Service catalog & fee schedules (Chargemaster) — **Tested**
+- [x] Automated invoice line generation from clinical orders & pharmacy dispensing — **Tested**
+- [x] Decimal monetary calculations (zero floating-point arithmetic) — **Tested**
+- [x] Payment capture with idempotency keys & sequential receipt numbering (`REC-YYYY-XXXXX`) — **Tested**
+- [x] Refund requests with supervisor approval workflow & balance restoration — **Tested**
+- [x] Daily cashier shift closing & cash reconciliation with printable vouchers — **Tested**
 
 ### Module H: Reports & Dashboard
 - [ ] Real-time operational dashboard (patient visits, today's appointments, queue length) — **Not started**

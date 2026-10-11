@@ -430,6 +430,106 @@ public static class DatabaseSeeder
                 }
             }
 
+            // Seed Standard Hospital Chargemaster (Fee Schedule)
+            if (!await context.ServiceItems.AnyAsync())
+            {
+                var services = new List<ServiceItem>
+                {
+                    new()
+                    {
+                        Id = Guid.NewGuid(),
+                        Code = "SRV-CONS-GEN",
+                        Name = "General Practitioner Consultation",
+                        Category = "Consultation",
+                        DefaultPrice = 35.00m,
+                        IsActive = true,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    },
+                    new()
+                    {
+                        Id = Guid.NewGuid(),
+                        Code = "SRV-CONS-SPEC",
+                        Name = "Specialist Physician Consultation",
+                        Category = "Consultation",
+                        DefaultPrice = 65.00m,
+                        IsActive = true,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    },
+                    new()
+                    {
+                        Id = Guid.NewGuid(),
+                        Code = "SRV-CONS-EMER",
+                        Name = "Emergency Triage & Evaluation",
+                        Category = "Emergency",
+                        DefaultPrice = 80.00m,
+                        IsActive = true,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    },
+                    new()
+                    {
+                        Id = Guid.NewGuid(),
+                        Code = "SRV-NURS-INJ",
+                        Name = "Intramuscular / Subcutaneous Injection",
+                        Category = "Nursing",
+                        DefaultPrice = 15.00m,
+                        IsActive = true,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    },
+                    new()
+                    {
+                        Id = Guid.NewGuid(),
+                        Code = "SRV-NURS-IV",
+                        Name = "Intravenous Cannulation & Fluid Setup",
+                        Category = "Nursing",
+                        DefaultPrice = 25.00m,
+                        IsActive = true,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    },
+                    new()
+                    {
+                        Id = Guid.NewGuid(),
+                        Code = "SRV-NURS-WND",
+                        Name = "Sterile Wound Dressing & Bandaging",
+                        Category = "Nursing",
+                        DefaultPrice = 30.00m,
+                        IsActive = true,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    },
+                    new()
+                    {
+                        Id = Guid.NewGuid(),
+                        Code = "SRV-DIAG-ECG",
+                        Name = "12-Lead Electrocardiogram (ECG)",
+                        Category = "Diagnostics",
+                        DefaultPrice = 45.00m,
+                        IsActive = true,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    },
+                    new()
+                    {
+                        Id = Guid.NewGuid(),
+                        Code = "SRV-DIAG-NEB",
+                        Name = "Nebulization Respiratory Therapy",
+                        Category = "Therapy",
+                        DefaultPrice = 20.00m,
+                        IsActive = true,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    }
+                };
+
+                context.ServiceItems.AddRange(services);
+                await context.SaveChangesAsync();
+                logger.LogInformation("Seeded standard hospital chargemaster fee schedule.");
+            }
+
             logger.LogInformation("Database seed checks successfully completed.");
         }
         catch (Exception ex)
