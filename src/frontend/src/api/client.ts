@@ -968,6 +968,91 @@ class ApiClient {
     const qs = searchParams.toString();
     return this.request<CashierShiftSummaryDto>(`/billing/cashier-shift/summary${qs ? `?${qs}` : ''}`);
   }
+
+  // Module H (Reports & Dashboard) Methods
+  async getOperationalDashboard(): Promise<OperationalDashboardDto> {
+    return this.request<OperationalDashboardDto>('/reports/dashboard');
+  }
+
+  async getFinancialReport(params?: {
+    fromDate?: string;
+    toDate?: string;
+  }): Promise<FinancialReportDto> {
+    const searchParams = new URLSearchParams();
+    if (params?.fromDate) searchParams.append('fromDate', params.fromDate);
+    if (params?.toDate) searchParams.append('toDate', params.toDate);
+    const qs = searchParams.toString();
+    return this.request<FinancialReportDto>(`/reports/financial${qs ? `?${qs}` : ''}`);
+  }
+
+  async exportFinancialCsv(params?: {
+    fromDate?: string;
+    toDate?: string;
+  }): Promise<void> {
+    const searchParams = new URLSearchParams();
+    if (params?.fromDate) searchParams.append('fromDate', params.fromDate);
+    if (params?.toDate) searchParams.append('toDate', params.toDate);
+    const qs = searchParams.toString();
+    return this.downloadReportCsv(`/reports/financial/export-csv${qs ? `?${qs}` : ''}`, 'Financial_Report.csv');
+  }
+
+  async getLaboratoryReport(params?: {
+    fromDate?: string;
+    toDate?: string;
+  }): Promise<LaboratoryReportDto> {
+    const searchParams = new URLSearchParams();
+    if (params?.fromDate) searchParams.append('fromDate', params.fromDate);
+    if (params?.toDate) searchParams.append('toDate', params.toDate);
+    const qs = searchParams.toString();
+    return this.request<LaboratoryReportDto>(`/reports/laboratory${qs ? `?${qs}` : ''}`);
+  }
+
+  async exportLaboratoryCsv(params?: {
+    fromDate?: string;
+    toDate?: string;
+  }): Promise<void> {
+    const searchParams = new URLSearchParams();
+    if (params?.fromDate) searchParams.append('fromDate', params.fromDate);
+    if (params?.toDate) searchParams.append('toDate', params.toDate);
+    const qs = searchParams.toString();
+    return this.downloadReportCsv(`/reports/laboratory/export-csv${qs ? `?${qs}` : ''}`, 'Laboratory_Workload_Report.csv');
+  }
+
+  async getPharmacyValuationReport(): Promise<PharmacyValuationReportDto> {
+    return this.request<PharmacyValuationReportDto>('/reports/pharmacy');
+  }
+
+  async exportPharmacyValuationCsv(): Promise<void> {
+    return this.downloadReportCsv('/reports/pharmacy/export-csv', 'Pharmacy_Stock_Valuation.csv');
+  }
+
+  async downloadReportCsv(endpoint: string, defaultFilename: string): Promise<void> {
+    const headers: Record<string, string> = {};
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
+    }
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, { headers });
+    if (!response.ok) {
+      throw new Error(`Failed to export CSV: ${response.statusText}`);
+    }
+    const blob = await response.blob();
+    const disposition = response.headers.get('content-disposition');
+    let filename = defaultFilename;
+    if (disposition && disposition.indexOf('filename=') !== -1) {
+      const match = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      if (match && match[1]) {
+        filename = match[1].replace(/['"]/g, '');
+      }
+    }
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  }
 }
 
 // Module C (Appointments & Scheduling) Interfaces
@@ -1838,6 +1923,112 @@ export interface BillingDashboardMetricsDto {
   pendingInvoicesCount: number;
   totalPaidInvoicesCount: number;
   activeServicesCount: number;
+}
+
+// Module H (Reports & Analytics) Interfaces
+export interface OperationalDashboardDto {
+  totalPatientsCount: number;
+  newPatientsTodayCount: number;
+  totalEncountersTodayCount: number;
+  activeEncountersCount: number;
+  appointmentsTodayTotal: number;
+  appointmentsWaitingCount: number;
+  appointmentsInConsultationCount: number;
+  appointmentsCompletedCount: number;
+  appointmentsNoShowCount: number;
+  departmentWorkloads: DepartmentWorkloadDto[];
+  pendingLabOrdersCount: number;
+  criticalLabResultsCount: number;
+  pendingPrescriptionsCount: number;
+  lowStockDrugsCount: number;
+  expiringBatchesCount: number;
+}
+
+export interface DepartmentWorkloadDto {
+  departmentId: string;
+  departmentName: string;
+  activeDoctorsCount: number;
+  todayAppointmentsCount: number;
+  todayEncountersCount: number;
+}
+
+export interface DailyRevenuePointDto {
+  date: string;
+  invoicedAmount: number;
+  collectedAmount: number;
+  refundedAmount: number;
+  netCollectedAmount: number;
+  invoicesCount: number;
+  paymentsCount: number;
+}
+
+export interface PaymentMethodRevenueDto {
+  methodName: string;
+  amount: number;
+  transactionsCount: number;
+  percentageOfTotal: number;
+}
+
+export interface FinancialReportDto {
+  fromDate: string;
+  toDate: string;
+  totalInvoiced: number;
+  totalCollected: number;
+  totalRefunded: number;
+  netCollected: number;
+  totalOutstandingReceivables: number;
+  totalDiscountsGranted: number;
+  totalTaxCollected: number;
+  totalInvoicesIssued: number;
+  totalPaymentsCaptured: number;
+  totalRefundsProcessed: number;
+  revenueByPaymentMethod: PaymentMethodRevenueDto[];
+  dailyTrend: DailyRevenuePointDto[];
+}
+
+export interface LabCategoryStatDto {
+  category: string;
+  ordersCount: number;
+  testsCount: number;
+  abnormalTestsCount: number;
+  totalRevenue: number;
+}
+
+export interface LaboratoryReportDto {
+  fromDate: string;
+  toDate: string;
+  totalOrdersCount: number;
+  totalTestsCount: number;
+  completedOrdersCount: number;
+  pendingOrdersCount: number;
+  abnormalResultsCount: number;
+  averageTurnaroundTimeHours: number;
+  categoryBreakdown: LabCategoryStatDto[];
+}
+
+export interface ExpiryHorizonDto {
+  horizonLabel: string;
+  batchesCount: number;
+  totalUnits: number;
+  costValue: number;
+  retailValue: number;
+}
+
+export interface PharmacyValuationReportDto {
+  generatedAt: string;
+  totalFormularyDrugsCount: number;
+  totalActiveBatchesCount: number;
+  totalUnitsOnHand: number;
+  totalInventoryCostValue: number;
+  totalInventoryRetailValue: number;
+  projectedGrossMarginValue: number;
+  projectedGrossMarginPercentage: number;
+  lowStockAlertsCount: number;
+  expiredWastageUnits: number;
+  expiredWastageCostValue: number;
+  damagedWastageUnits: number;
+  damagedWastageCostValue: number;
+  expiryAgingSchedule: ExpiryHorizonDto[];
 }
 
 export const api = new ApiClient();

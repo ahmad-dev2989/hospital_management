@@ -23,9 +23,9 @@ This implementation plan tracks the lifecycle, phase progress, and module status
 | **Phase 5** | Appointments & Scheduling | **Tested** | Doctor schedules, slot engine, transaction-safe booking, check-in queue, conflict prevention, cancellation. |
 | **Phase 6** | Clinical Management | **Tested** | Encounters, notes (SOAP), vitals, diagnoses, allergies, draft/signing lifecycle, immutable addenda, e-prescriptions. |
 | **Phase 7** | Laboratory Management | **Tested** | Test catalog, order worklist, specimen barcode tracking, result entry, dual-step verification, critical alerts. |
-| **Phase 8** | Pharmacy & Inventory | **Not started** | Drug catalog, FEFO batch tracking, expiry monitoring, transaction-safe dispensing, stock movements ledger. |
-| **Phase 9** | Billing & Payments | **Not started** | Service catalog, invoice generation, payment capture, idempotent transactions, receipts, refunds, shift close. |
-| **Phase 10** | Reports & Dashboard | **Not started** | Real-time database metrics, financial reconciliation, clinical turnaround, appointment stats, data export. |
+| **Phase 8** | Pharmacy & Inventory | **Tested** | Drug catalog, FEFO batch tracking, expiry monitoring, transaction-safe dispensing, stock movements ledger. |
+| **Phase 9** | Billing & Payments | **Tested** | Service catalog, invoice generation, payment capture, idempotent transactions, receipts, refunds, shift close. |
+| **Phase 10** | Reports & Dashboard | **Tested** | Real-time database metrics, financial reconciliation, clinical turnaround, appointment stats, data export. |
 | **Phase 11** | Local Documents & Backup | **Not started** | Secure local storage, SHA-256 deduplication, automated pg_dump backup schedule, restore verification. |
 | **Phase 12** | Integration & UX Polish | **Not started** | Cross-module navigation, responsive desktop layouts, error toast handling, keyboard accessibility. |
 | **Phase 13** | Security, Reliability & Performance | **Not started** | Concurrency tests (slot double-booking, stock race conditions), load validation, security audit. |
@@ -96,11 +96,11 @@ This implementation plan tracks the lifecycle, phase progress, and module status
 - [x] Daily cashier shift closing & cash reconciliation with printable vouchers — **Tested**
 
 ### Module H: Reports & Dashboard
-- [ ] Real-time operational dashboard (patient visits, today's appointments, queue length) — **Not started**
-- [ ] Financial daily collection reports (cash, card, bank, outstanding balances) — **Not started**
-- [ ] Laboratory turnaround time & order volume reports — **Not started**
-- [ ] Pharmacy stock valuation and wastage reports — **Not started**
-- [ ] CSV/PDF report export — **Not started**
+- [x] Real-time operational dashboard (patient visits, today's appointments, queue length) — **Tested**
+- [x] Financial daily collection reports (cash, card, bank, outstanding balances) — **Tested**
+- [x] Laboratory turnaround time & order volume reports — **Tested**
+- [x] Pharmacy stock valuation and wastage reports — **Tested**
+- [x] CSV/PDF report export — **Tested**
 
 ### Module I: Documents & Local Storage
 - [x] DocumentMetadata schema with SHA-256 hash & MIME validation — **Implemented**
