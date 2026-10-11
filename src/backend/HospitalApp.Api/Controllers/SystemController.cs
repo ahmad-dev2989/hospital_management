@@ -126,6 +126,42 @@ public class SystemController : ControllerBase
         return NoContent();
     }
 
+    [HttpGet("backups/{fileName}/download")]
+    [Authorize(Roles = "SystemAdministrator,HospitalAdministrator")]
+    public async Task<IActionResult> DownloadBackup(string fileName, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var (stream, mimeType, name) = await _systemService.GetBackupStreamAsync(fileName, cancellationToken);
+            return File(stream, mimeType, name);
+        }
+        catch (FileNotFoundException ex)
+        {
+            return NotFound(new { error = new { code = "BACKUP_FILE_NOT_FOUND", message = ex.Message } });
+        }
+    }
+
+    [HttpPost("backups/{fileName}/restore")]
+    [Authorize(Roles = "SystemAdministrator,HospitalAdministrator")]
+    public async Task<IActionResult> RestoreBackup(string fileName, CancellationToken cancellationToken)
+    {
+        var (userId, _) = GetCurrentUser();
+        try
+        {
+            var msg = await _systemService.RestoreBackupAsync(fileName, userId, cancellationToken);
+            return Ok(new { message = msg });
+        }
+        catch (FileNotFoundException ex)
+        {
+            return NotFound(new { error = new { code = "BACKUP_FILE_NOT_FOUND", message = ex.Message } });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to restore database from backup '{FileName}'.", fileName);
+            return StatusCode(500, new { error = new { code = "RESTORE_FAILED", message = ex.Message } });
+        }
+    }
+
     [HttpGet("info")]
     public async Task<IActionResult> GetSystemInfo(CancellationToken cancellationToken)
     {

@@ -30,6 +30,7 @@ builder.Services.AddScoped<IBillingService, BillingService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
 builder.Services.AddScoped<ISystemService, SystemService>();
+builder.Services.AddHostedService<DatabaseBackupSchedulerService>();
 
 // 3. JWT Authentication & Authorization
 var jwtSecret = builder.Configuration["JwtSettings:Secret"] 

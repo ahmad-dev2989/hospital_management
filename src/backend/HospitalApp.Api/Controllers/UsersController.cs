@@ -293,6 +293,41 @@ public class UsersController : ControllerBase
         return Ok(new { isActive = user.IsActive, message = $"User {user.Username} is now {(user.IsActive ? "Active" : "Deactivated")}." });
     }
 
+    [HttpDelete("{id:guid}")]
+    [Authorize(Roles = "SystemAdministrator")]
+    public async Task<IActionResult> DeleteUser(Guid id)
+    {
+        var currentUserId = GetCurrentUserId();
+        if (currentUserId.HasValue && currentUserId.Value == id)
+        {
+            return BadRequest(new { error = new { code = "SELF_DELETION_PROHIBITED", message = "You cannot delete your own active administrator account." } });
+        }
+
+        var user = await _dbContext.UserAccounts.FindAsync(id);
+        if (user == null)
+        {
+            return NotFound();
+        }
+
+        var actorName = User.FindFirstValue(ClaimTypes.Name) ?? "Admin";
+        var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "127.0.0.1";
+
+        _dbContext.UserAccounts.Remove(user);
+        await _dbContext.SaveChangesAsync();
+
+        await _auditService.LogAsync(
+            currentUserId,
+            actorName,
+            "User.Deleted",
+            "UserAccount",
+            id.ToString(),
+            $"Permanently deleted user {user.Username} ({user.FullName})",
+            ip
+        );
+
+        return NoContent();
+    }
+
     private Guid? GetCurrentUserId()
     {
         var idStr = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");

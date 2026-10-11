@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using HospitalApp.Core.Entities;
+using HospitalApp.Core.Enums;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 
@@ -39,6 +40,19 @@ public class JwtTokenService : ITokenService
             new("RoleInt", ((int)user.Role).ToString()),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
+
+        // If user is administrator, grant full universal privileges across all hospital workstations
+        if (user.Role == UserRole.SystemAdministrator || user.Role == UserRole.HospitalAdministrator)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, "Admin"));
+            claims.Add(new Claim(ClaimTypes.Role, "Doctor"));
+            claims.Add(new Claim(ClaimTypes.Role, "Nurse"));
+            claims.Add(new Claim(ClaimTypes.Role, "Receptionist"));
+            claims.Add(new Claim(ClaimTypes.Role, "LabTechnician"));
+            claims.Add(new Claim(ClaimTypes.Role, "Pharmacist"));
+            claims.Add(new Claim(ClaimTypes.Role, "Cashier"));
+            claims.Add(new Claim(ClaimTypes.Role, "Auditor"));
+        }
 
         var tokenDescriptor = new SecurityTokenDescriptor
         {

@@ -384,6 +384,63 @@ public class SystemService : ISystemService
         return true;
     }
 
+    public async Task<(Stream Stream, string MimeType, string DownloadName)> GetBackupStreamAsync(string fileName, CancellationToken cancellationToken = default)
+    {
+        var sanitized = Path.GetFileName(fileName);
+        var targetPath = Path.Combine(_backupRoot, sanitized);
+        var canonical = Path.GetFullPath(targetPath);
+
+        if (!canonical.StartsWith(_backupRoot, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Illegal backup file path requested.");
+        }
+
+        if (!File.Exists(canonical))
+        {
+            throw new FileNotFoundException($"Backup archive '{sanitized}' does not exist on disk.");
+        }
+
+        var stream = new FileStream(canonical, FileMode.Open, FileAccess.Read, FileShare.Read);
+        return (stream, "application/sql", sanitized);
+    }
+
+    public async Task<string> RestoreBackupAsync(string fileName, Guid actorUserId, CancellationToken cancellationToken = default)
+    {
+        var sanitized = Path.GetFileName(fileName);
+        var targetPath = Path.Combine(_backupRoot, sanitized);
+        var canonical = Path.GetFullPath(targetPath);
+
+        if (!canonical.StartsWith(_backupRoot, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Illegal backup file path requested.");
+        }
+
+        if (!File.Exists(canonical))
+        {
+            throw new FileNotFoundException($"Backup archive '{sanitized}' does not exist on disk.");
+        }
+
+        _logger.LogInformation("Restoring/installing database from backup '{FileName}'...", sanitized);
+
+        var sqlContent = await File.ReadAllTextAsync(canonical, cancellationToken);
+        
+        await _context.Database.ExecuteSqlRawAsync(sqlContent, cancellationToken);
+
+        var actor = await _context.UserAccounts.FirstOrDefaultAsync(u => u.Id == actorUserId, cancellationToken);
+        var actorName = actor?.Username ?? "system";
+
+        await _auditService.LogAsync(
+            actorUserId,
+            actorName,
+            "DATABASE_BACKUP_RESTORED",
+            "SystemBackup",
+            sanitized,
+            $"Database successfully restored and installed from backup archive '{sanitized}'.",
+            "127.0.0.1");
+
+        return $"Database successfully restored from '{sanitized}'.";
+    }
+
     public async Task<SystemInfoDto> GetSystemInfoAsync(CancellationToken cancellationToken = default)
     {
         var recordCounts = new Dictionary<string, int>

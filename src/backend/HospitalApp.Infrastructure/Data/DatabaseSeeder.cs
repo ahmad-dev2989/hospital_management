@@ -14,49 +14,35 @@ public static class DatabaseSeeder
             // 1. Ensure migrations are applied
             await context.Database.MigrateAsync();
 
-            // 2. Seed Default Staff Accounts
-            var initialUsers = new List<(string Username, string Email, string FullName, UserRole Role, string Password)>
+            // 2. Seed Master Administrator Account (Admin is the primary master user)
+            var adminUser = await context.UserAccounts.FirstOrDefaultAsync(u => u.Username.ToLower() == "admin");
+            if (adminUser == null)
             {
-                ("admin", "admin@hospital.local", "System Administrator", UserRole.SystemAdministrator, "Admin@123"),
-                ("dr.smith", "smith@hospital.local", "Dr. Marcus Smith, MD", UserRole.Doctor, "Doctor@123"),
-                ("dr.sarah", "sarah@hospital.local", "Dr. Sarah Jenkins, MD", UserRole.Doctor, "Doctor@123"),
-                ("nurse.jane", "jane@hospital.local", "Jane Doe, RN", UserRole.Nurse, "Nurse@123"),
-                ("reception", "reception@hospital.local", "Reception Desk", UserRole.Receptionist, "Reception@123"),
-                ("labtech", "lab@hospital.local", "Lab Technician", UserRole.LabTechnician, "Lab@123"),
-                ("pharmacist", "pharmacy@hospital.local", "Chief Pharmacist", UserRole.Pharmacist, "Pharmacy@123"),
-                ("cashier", "cashier@hospital.local", "Cashier Shift A", UserRole.Cashier, "Cashier@123"),
-                ("auditor", "auditor@hospital.local", "Clinical Compliance Auditor", UserRole.Auditor, "Auditor@123")
-            };
-
-            foreach (var (username, email, fullName, role, pwd) in initialUsers)
+                logger.LogInformation("Seeding master administrator account: admin");
+                adminUser = new UserAccount
+                {
+                    Id = Guid.NewGuid(),
+                    Username = "admin",
+                    Email = "admin@hospital.local",
+                    FullName = "System Administrator",
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@123", workFactor: 11),
+                    Role = UserRole.SystemAdministrator,
+                    IsActive = true,
+                    FailedLoginAttempts = 0,
+                    LockoutUntil = null,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+                context.UserAccounts.Add(adminUser);
+            }
+            else
             {
-                var existing = await context.UserAccounts.FirstOrDefaultAsync(u => u.Username.ToLower() == username.ToLower());
-                if (existing == null)
-                {
-                    logger.LogInformation("Seeding account: {Username} ({Role})", username, role);
-                    context.UserAccounts.Add(new UserAccount
-                    {
-                        Id = Guid.NewGuid(),
-                        Username = username,
-                        Email = email,
-                        FullName = fullName,
-                        PasswordHash = BCrypt.Net.BCrypt.HashPassword(pwd, workFactor: 11),
-                        Role = role,
-                        IsActive = true,
-                        FailedLoginAttempts = 0,
-                        LockoutUntil = null,
-                        CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow
-                    });
-                }
-                else
-                {
-                    existing.PasswordHash = BCrypt.Net.BCrypt.HashPassword(pwd, workFactor: 11);
-                    existing.IsActive = true;
-                    existing.FailedLoginAttempts = 0;
-                    existing.LockoutUntil = null;
-                    existing.UpdatedAt = DateTime.UtcNow;
-                }
+                adminUser.PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@123", workFactor: 11);
+                adminUser.IsActive = true;
+                adminUser.Role = UserRole.SystemAdministrator;
+                adminUser.FailedLoginAttempts = 0;
+                adminUser.LockoutUntil = null;
+                adminUser.UpdatedAt = DateTime.UtcNow;
             }
             await context.SaveChangesAsync();
 
@@ -280,101 +266,171 @@ public static class DatabaseSeeder
                 logger.LogInformation("Seeded baseline patients, allergies, and chronic conditions.");
             }
 
-            // 9. Seed Doctors and Weekly Schedules if empty
-            if (!await context.Doctors.AnyAsync())
+            // 9. Ensure Chief Medical Administrator Doctor Profile & Schedules
+            var genDept = await context.Departments.FirstOrDefaultAsync(d => d.Code == "GEN") 
+                ?? await context.Departments.FirstAsync();
+
+            var adminDoctor = await context.Doctors
+                .Include(d => d.Schedules)
+                .FirstOrDefaultAsync(d => d.UserId == adminUser.Id);
+
+            if (adminDoctor == null)
             {
-                logger.LogInformation("Seeding clinical doctors and weekly schedules...");
-                var drSmithUser = await context.UserAccounts.FirstOrDefaultAsync(u => u.Username.ToLower() == "dr.smith");
-                var drSarahUser = await context.UserAccounts.FirstOrDefaultAsync(u => u.Username.ToLower() == "dr.sarah");
-                var genDept = await context.Departments.FirstOrDefaultAsync(d => d.Code == "GEN");
-                var pedDept = await context.Departments.FirstOrDefaultAsync(d => d.Code == "PED");
-
-                if (drSmithUser != null && genDept != null)
+                logger.LogInformation("Creating Master Doctor profile for Administrator (Chief Medical Officer)...");
+                adminDoctor = new Doctor
                 {
-                    var drSmith = new Doctor
+                    Id = Guid.NewGuid(),
+                    UserId = adminUser.Id,
+                    DepartmentId = genDept.Id,
+                    LicenseNumber = "MD-ADM-2026-001",
+                    Specialization = "Chief Medical Officer & General Physician",
+                    ConsultationFee = 50.00m,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+                context.Doctors.Add(adminDoctor);
+                await context.SaveChangesAsync();
+
+                // Add Monday through Sunday schedule (0 through 6)
+                for (int day = 0; day <= 6; day++)
+                {
+                    context.DoctorSchedules.Add(new DoctorSchedule
                     {
                         Id = Guid.NewGuid(),
-                        UserId = drSmithUser.Id,
-                        DepartmentId = genDept.Id,
-                        LicenseNumber = "MD-GEN-2018-091",
-                        Specialization = "Internal & General Medicine",
-                        ConsultationFee = 50.00m,
+                        DoctorId = adminDoctor.Id,
+                        DayOfWeek = day,
+                        StartTime = TimeSpan.FromHours(8),
+                        EndTime = TimeSpan.FromHours(18),
+                        SlotDurationMinutes = 15,
                         IsActive = true,
                         CreatedAt = DateTime.UtcNow,
                         UpdatedAt = DateTime.UtcNow
-                    };
-                    context.Doctors.Add(drSmith);
-
-                    // Add Monday to Friday schedule
-                    for (int day = 1; day <= 5; day++)
-                    {
-                        context.DoctorSchedules.Add(new DoctorSchedule
-                        {
-                            Id = Guid.NewGuid(),
-                            DoctorId = drSmith.Id,
-                            DayOfWeek = day,
-                            StartTime = TimeSpan.FromHours(9),
-                            EndTime = TimeSpan.FromHours(17),
-                            SlotDurationMinutes = 15,
-                            IsActive = true,
-                            CreatedAt = DateTime.UtcNow,
-                            UpdatedAt = DateTime.UtcNow
-                        });
-                    }
+                    });
                 }
+                await context.SaveChangesAsync();
+            }
 
-                if (drSarahUser != null && pedDept != null)
+            // Re-assign any appointments or encounters pointing to legacy doctors to Admin
+            var legacyDoctors = await context.Doctors
+                .Where(d => d.Id != adminDoctor.Id)
+                .ToListAsync();
+
+            if (legacyDoctors.Any())
+            {
+                var legacyDoctorIds = legacyDoctors.Select(d => d.Id).ToList();
+
+                var apptsToMigrate = await context.Appointments
+                    .Where(a => legacyDoctorIds.Contains(a.DoctorId))
+                    .ToListAsync();
+                foreach (var a in apptsToMigrate)
                 {
-                    var drSarah = new Doctor
-                    {
-                        Id = Guid.NewGuid(),
-                        UserId = drSarahUser.Id,
-                        DepartmentId = pedDept.Id,
-                        LicenseNumber = "MD-PED-2020-112",
-                        Specialization = "Pediatric Care & Child Health",
-                        ConsultationFee = 60.00m,
-                        IsActive = true,
-                        CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow
-                    };
-                    context.Doctors.Add(drSarah);
-
-                    // Add Monday, Wednesday, Friday schedule
-                    var sarahDays = new[] { 1, 3, 5 };
-                    foreach (var day in sarahDays)
-                    {
-                        context.DoctorSchedules.Add(new DoctorSchedule
-                        {
-                            Id = Guid.NewGuid(),
-                            DoctorId = drSarah.Id,
-                            DayOfWeek = day,
-                            StartTime = new TimeSpan(8, 30, 0),
-                            EndTime = new TimeSpan(16, 30, 0),
-                            SlotDurationMinutes = 20,
-                            IsActive = true,
-                            CreatedAt = DateTime.UtcNow,
-                            UpdatedAt = DateTime.UtcNow
-                        });
-                    }
+                    a.DoctorId = adminDoctor.Id;
+                    a.DepartmentId = adminDoctor.DepartmentId;
                 }
+
+                var encsToMigrate = await context.Encounters
+                    .Where(e => legacyDoctorIds.Contains(e.DoctorId) || (e.SignedByDoctorId.HasValue && legacyDoctorIds.Contains(e.SignedByDoctorId.Value)))
+                    .ToListAsync();
+                foreach (var e in encsToMigrate)
+                {
+                    if (legacyDoctorIds.Contains(e.DoctorId)) e.DoctorId = adminDoctor.Id;
+                    if (e.SignedByDoctorId.HasValue && legacyDoctorIds.Contains(e.SignedByDoctorId.Value)) e.SignedByDoctorId = adminDoctor.Id;
+                }
+
+                var legacySchedules = await context.DoctorSchedules
+                    .Where(s => legacyDoctorIds.Contains(s.DoctorId))
+                    .ToListAsync();
+                context.DoctorSchedules.RemoveRange(legacySchedules);
+                context.Doctors.RemoveRange(legacyDoctors);
+                await context.SaveChangesAsync();
+            }
+
+            // Remove legacy non-admin staff accounts (Only admin is the primary user)
+            var nonAdminUsers = await context.UserAccounts
+                .Where(u => u.Id != adminUser.Id && u.Username.ToLower() != "admin")
+                .ToListAsync();
+
+            if (nonAdminUsers.Any())
+            {
+                logger.LogInformation("Purging {Count} legacy non-admin accounts. Re-linking foreign keys to Admin...", nonAdminUsers.Count);
+                var nonAdminIds = nonAdminUsers.Select(u => u.Id).ToList();
+
+                // 1. AuditEvents
+                var auditToMigrate = await context.AuditEvents
+                    .Where(a => a.ActorUserId.HasValue && nonAdminIds.Contains(a.ActorUserId.Value))
+                    .ToListAsync();
+                foreach (var a in auditToMigrate) a.ActorUserId = adminUser.Id;
+
+                // 2. VitalSigns
+                var vitalsToMigrate = await context.VitalSigns
+                    .Where(v => nonAdminIds.Contains(v.RecordedByUserId))
+                    .ToListAsync();
+                foreach (var v in vitalsToMigrate) v.RecordedByUserId = adminUser.Id;
+
+                // 3. StockMovements
+                var stocksToMigrate = await context.StockMovements
+                    .Where(s => nonAdminIds.Contains(s.PerformedByUserId))
+                    .ToListAsync();
+                foreach (var s in stocksToMigrate) s.PerformedByUserId = adminUser.Id;
+
+                // 4. Refunds
+                var refundsToMigrate = await context.Refunds
+                    .Where(r => nonAdminIds.Contains(r.AuthorizedByUserId))
+                    .ToListAsync();
+                foreach (var r in refundsToMigrate) r.AuthorizedByUserId = adminUser.Id;
+
+                // 5. Payments
+                var paymentsToMigrate = await context.Payments
+                    .Where(p => nonAdminIds.Contains(p.CashierUserId))
+                    .ToListAsync();
+                foreach (var p in paymentsToMigrate) p.CashierUserId = adminUser.Id;
+
+                // 6. Invoices
+                var invoicesToMigrate = await context.Invoices
+                    .Where(i => nonAdminIds.Contains(i.CreatedByUserId))
+                    .ToListAsync();
+                foreach (var i in invoicesToMigrate) i.CreatedByUserId = adminUser.Id;
+
+                // 7. LabOrderItems
+                var labEnteredToMigrate = await context.LabOrderItems
+                    .Where(l => l.EnteredByUserId.HasValue && nonAdminIds.Contains(l.EnteredByUserId.Value))
+                    .ToListAsync();
+                foreach (var l in labEnteredToMigrate) l.EnteredByUserId = adminUser.Id;
+
+                var labVerifiedToMigrate = await context.LabOrderItems
+                    .Where(l => l.VerifiedByUserId.HasValue && nonAdminIds.Contains(l.VerifiedByUserId.Value))
+                    .ToListAsync();
+                foreach (var l in labVerifiedToMigrate) l.VerifiedByUserId = adminUser.Id;
+
+                // 8. DocumentMetadatas
+                var docsToMigrate = await context.Documents
+                    .Where(d => nonAdminIds.Contains(d.UploadedByUserId))
+                    .ToListAsync();
+                foreach (var d in docsToMigrate) d.UploadedByUserId = adminUser.Id;
+
+                // 9. DispenseRecords
+                var dispToMigrate = await context.DispenseRecords
+                    .Where(d => nonAdminIds.Contains(d.PharmacistUserId))
+                    .ToListAsync();
+                foreach (var d in dispToMigrate) d.PharmacistUserId = adminUser.Id;
 
                 await context.SaveChangesAsync();
-                logger.LogInformation("Seeded clinical doctors and weekly schedules.");
+
+                context.UserAccounts.RemoveRange(nonAdminUsers);
+                await context.SaveChangesAsync();
+                logger.LogInformation("Successfully purged all legacy non-admin accounts. Admin is now the sole user.");
             }
 
             // 10. Seed Baseline Appointments if empty
             if (!await context.Appointments.AnyAsync())
             {
                 logger.LogInformation("Seeding baseline clinical appointments for today's clinic...");
-                var drSmith = await context.Doctors
-                    .Include(d => d.Department)
-                    .FirstOrDefaultAsync(d => d.LicenseNumber == "MD-GEN-2018-091");
-
                 var p1 = await context.Patients.FirstOrDefaultAsync(p => p.PatientNumber == "HSP-2026-00001");
                 var p2 = await context.Patients.FirstOrDefaultAsync(p => p.PatientNumber == "HSP-2026-00002");
                 var p3 = await context.Patients.FirstOrDefaultAsync(p => p.PatientNumber == "HSP-2026-00003");
 
-                if (drSmith != null && p1 != null && p2 != null && p3 != null)
+                if (p1 != null && p2 != null && p3 != null)
                 {
                     var today = DateTime.SpecifyKind(DateTime.UtcNow.Date, DateTimeKind.Utc);
 
@@ -385,8 +441,8 @@ public static class DatabaseSeeder
                             Id = Guid.NewGuid(),
                             AppointmentNumber = "APT-2026-00001",
                             PatientId = p1.Id,
-                            DoctorId = drSmith.Id,
-                            DepartmentId = drSmith.DepartmentId,
+                            DoctorId = adminDoctor.Id,
+                            DepartmentId = adminDoctor.DepartmentId,
                             StartsAt = today.AddHours(9).AddMinutes(15),
                             EndsAt = today.AddHours(9).AddMinutes(30),
                             Status = AppointmentStatus.Waiting,
@@ -399,8 +455,8 @@ public static class DatabaseSeeder
                             Id = Guid.NewGuid(),
                             AppointmentNumber = "APT-2026-00002",
                             PatientId = p2.Id,
-                            DoctorId = drSmith.Id,
-                            DepartmentId = drSmith.DepartmentId,
+                            DoctorId = adminDoctor.Id,
+                            DepartmentId = adminDoctor.DepartmentId,
                             StartsAt = today.AddHours(10),
                             EndsAt = today.AddHours(10).AddMinutes(15),
                             Status = AppointmentStatus.InConsultation,
@@ -413,8 +469,8 @@ public static class DatabaseSeeder
                             Id = Guid.NewGuid(),
                             AppointmentNumber = "APT-2026-00003",
                             PatientId = p3.Id,
-                            DoctorId = drSmith.Id,
-                            DepartmentId = drSmith.DepartmentId,
+                            DoctorId = adminDoctor.Id,
+                            DepartmentId = adminDoctor.DepartmentId,
                             StartsAt = today.AddHours(11).AddMinutes(30),
                             EndsAt = today.AddHours(11).AddMinutes(45),
                             Status = AppointmentStatus.Booked,

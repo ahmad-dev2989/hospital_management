@@ -6,14 +6,7 @@ import {
   ShieldCheck,
   AlertTriangle,
   Eye,
-  EyeOff,
-  Stethoscope,
-  HeartPulse,
-  Receipt,
-  FlaskConical,
-  Pill,
-  UserCheck,
-  FileSearch
+  EyeOff
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import type { ApiError } from '../api/client';
@@ -28,14 +21,14 @@ interface PresetUser {
 }
 
 const PRESET_USERS: PresetUser[] = [
-  { roleName: 'System Admin', username: 'admin', password: 'Admin@123', title: 'Full System Control & Audit', icon: ShieldCheck, badgeClass: 'role-admin' },
-  { roleName: 'Doctor', username: 'dr.smith', password: 'Doctor@123', title: 'Consultations, SOAP Notes, Orders', icon: Stethoscope, badgeClass: 'role-doctor' },
-  { roleName: 'Nurse', username: 'nurse.jane', password: 'Nurse@123', title: 'Triage, Vitals Recording, Care', icon: HeartPulse, badgeClass: 'role-nurse' },
-  { roleName: 'Reception', username: 'reception', password: 'Reception@123', title: 'Patient Registration & Booking', icon: UserCheck, badgeClass: 'role-reception' },
-  { roleName: 'Lab Tech', username: 'labtech', password: 'Lab@123', title: 'Specimens, Barcodes & Results', icon: FlaskConical, badgeClass: 'role-lab' },
-  { roleName: 'Pharmacist', username: 'pharmacist', password: 'Pharmacy@123', title: 'FEFO Dispensing & Formularies', icon: Pill, badgeClass: 'role-pharmacy' },
-  { roleName: 'Cashier', username: 'cashier', password: 'Cashier@123', title: 'Invoicing, Payments & Receipts', icon: Receipt, badgeClass: 'role-cashier' },
-  { roleName: 'Auditor', username: 'auditor', password: 'Auditor@123', title: 'Immutable Security & Logs', icon: FileSearch, badgeClass: 'role-auditor' },
+  {
+    roleName: 'Master Administrator',
+    username: 'admin',
+    password: 'Admin@123',
+    title: 'Full Workstation Control: Doctor, Nurse, Reception, Lab, Pharmacy, Cashier & Auditor',
+    icon: ShieldCheck,
+    badgeClass: 'role-admin'
+  },
 ];
 
 export const Login: React.FC = () => {
@@ -168,13 +161,13 @@ export const Login: React.FC = () => {
           </button>
         </form>
 
-        {/* Quick Clinical Role Switcher for Offline Deployment */}
+        {/* Master Administrator Preset & User Creation Notice */}
         <div className="preset-selector-section">
           <div className="preset-divider">
-            <span>Workstation Quick Switch (Offline Roles)</span>
+            <span>Primary System Access</span>
           </div>
 
-          <div className="preset-grid">
+          <div className="preset-grid" style={{ gridTemplateColumns: '1fr' }}>
             {PRESET_USERS.map((preset) => {
               const Icon = preset.icon;
               const isSelected = username === preset.username;
@@ -185,16 +178,22 @@ export const Login: React.FC = () => {
                   className={`preset-btn ${isSelected ? 'preset-active' : ''}`}
                   onClick={() => handleApplyPreset(preset)}
                   title={`${preset.title} (${preset.username} / ${preset.password})`}
+                  style={{ padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}
                 >
-                  <Icon size={16} />
-                  <div className="preset-info">
-                    <span className="preset-name">{preset.roleName}</span>
-                    <span className="preset-user">@{preset.username}</span>
+                  <Icon size={20} color="#0d9488" />
+                  <div className="preset-info" style={{ textAlign: 'left' }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#0f172a' }}>{preset.roleName}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                      @{preset.username} • Omnipotent access (Doctor, Nurse, Reception, Lab, Pharmacy, Cashier & Auditor)
+                    </div>
                   </div>
                 </button>
               );
             })}
           </div>
+          <p style={{ margin: '0.75rem 0 0', fontSize: '0.75rem', color: '#64748b', textAlign: 'center' }}>
+            Admin can create new staff accounts and assign custom privileges in <strong>Administration &rarr; User Management</strong>.
+          </p>
         </div>
 
         {/* Offline Security Footer */}

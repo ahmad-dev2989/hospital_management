@@ -13,6 +13,8 @@ public interface ISystemService
     Task<DatabaseBackupDto> CreateBackupAsync(Guid actorUserId, CancellationToken cancellationToken = default);
     Task<DatabaseBackupDto> VerifyBackupAsync(string fileName, CancellationToken cancellationToken = default);
     Task<bool> DeleteBackupAsync(string fileName, Guid actorUserId, CancellationToken cancellationToken = default);
+    Task<(Stream Stream, string MimeType, string DownloadName)> GetBackupStreamAsync(string fileName, CancellationToken cancellationToken = default);
+    Task<string> RestoreBackupAsync(string fileName, Guid actorUserId, CancellationToken cancellationToken = default);
 
     Task<SystemInfoDto> GetSystemInfoAsync(CancellationToken cancellationToken = default);
     Task<string> RunMaintenanceAsync(Guid actorUserId, CancellationToken cancellationToken = default);

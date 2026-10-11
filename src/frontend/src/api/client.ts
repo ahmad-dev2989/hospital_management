@@ -374,6 +374,12 @@ class ApiClient {
     });
   }
 
+  async deleteUser(id: string): Promise<void> {
+    return this.request<void>(`/users/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
   // Audit Logs
   async getAuditEvents(params: {
     action?: string;
@@ -1164,6 +1170,16 @@ class ApiClient {
   async deleteDatabaseBackup(fileName: string): Promise<void> {
     return this.request<void>(`/system/backups/${encodeURIComponent(fileName)}`, {
       method: 'DELETE',
+    });
+  }
+
+  async downloadDatabaseBackup(fileName: string): Promise<void> {
+    await this.downloadReportCsv(`/system/backups/${encodeURIComponent(fileName)}/download`, fileName);
+  }
+
+  async restoreDatabaseBackup(fileName: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/system/backups/${encodeURIComponent(fileName)}/restore`, {
+      method: 'POST',
     });
   }
 

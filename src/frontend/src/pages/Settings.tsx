@@ -18,7 +18,8 @@ import {
   Layers,
   Sparkles,
   UserCheck,
-  Eye
+  Eye,
+  RotateCcw
 } from 'lucide-react';
 import {
   api,
@@ -77,6 +78,8 @@ export const Settings: React.FC = () => {
   const [backups, setBackups] = useState<DatabaseBackupDto[]>([]);
   const [creatingBackup, setCreatingBackup] = useState(false);
   const [verifyingFile, setVerifyingFile] = useState<string | null>(null);
+  const [downloadingFile, setDownloadingFile] = useState<string | null>(null);
+  const [restoringFile, setRestoringFile] = useState<string | null>(null);
 
   // TAB 4: System Telemetry State
   const [systemInfo, setSystemInfo] = useState<SystemInfoDto | null>(null);
@@ -326,6 +329,36 @@ export const Settings: React.FC = () => {
       loadBackups();
     } catch (err: any) {
       alert('Failed to delete backup: ' + (err.message || 'Unknown error'));
+    }
+  };
+
+  const handleDownloadBackup = async (fileName: string) => {
+    setDownloadingFile(fileName);
+    try {
+      await api.downloadDatabaseBackup(fileName);
+    } catch (err: any) {
+      alert('Failed to download backup: ' + (err.message || 'Unknown error'));
+    } finally {
+      setDownloadingFile(null);
+    }
+  };
+
+  const handleRestoreBackup = async (fileName: string) => {
+    if (!window.confirm(`CAUTION: Are you sure you want to restore / install the database from backup archive '${fileName}'?\n\nThis will execute the backup script and update database tables with this snapshot.`)) {
+      return;
+    }
+    setRestoringFile(fileName);
+    setError(null);
+    try {
+      const res = await api.restoreDatabaseBackup(fileName);
+      setSuccessMsg(res.message || `Database successfully restored from ${fileName}.`);
+      setTimeout(() => setSuccessMsg(null), 5000);
+      loadBackups();
+    } catch (err: any) {
+      const apiErr = err as ApiError;
+      setError(apiErr.message || 'Failed to restore database from backup.');
+    } finally {
+      setRestoringFile(null);
     }
   };
 
@@ -1087,12 +1120,17 @@ export const Settings: React.FC = () => {
           {/* Header Card */}
           <div className="card" style={{ padding: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
-              <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <ShieldCheck size={18} color="#10b981" />
-                PostgreSQL Automated Backup & Disaster Recovery
-              </h3>
-              <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                Direct native pg_dump database export with SHA-256 hash validation and offline restore readiness.
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.35rem' }}>
+                <ShieldCheck size={20} color="#10b981" />
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0 }}>
+                  PostgreSQL Automated Backup & Disaster Recovery
+                </h3>
+                <span className="badge badge-success" style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}>
+                  24-Hour Auto-Schedule Active
+                </span>
+              </div>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                Direct native database export with SHA-256 hash validation, 1-click PC download, and instant database restore.
               </p>
             </div>
 
@@ -1105,6 +1143,27 @@ export const Settings: React.FC = () => {
               <Database size={16} className={creatingBackup ? 'spin' : ''} />
               {creatingBackup ? 'Creating Native Backup...' : 'Create Instant Backup Now'}
             </button>
+          </div>
+
+          {/* 24-Hour Policy Notice Card */}
+          <div style={{
+            background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
+            border: '1px solid #bbf7d0',
+            borderRadius: '8px',
+            padding: '1rem 1.25rem',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '0.75rem'
+          }}>
+            <RefreshCw size={18} color="#16a34a" style={{ marginTop: '0.15rem', flexShrink: 0 }} />
+            <div style={{ fontSize: '0.825rem', color: '#166534', lineHeight: 1.5 }}>
+              <strong>Automated 24-Hour Backup & Launch Auto-Recovery Policy:</strong>
+              <div style={{ marginTop: '0.25rem' }}>
+                The background scheduler runs continuously to create a complete database snapshot every 24 hours.
+                If the application remains closed for more than 24 hours, an automated backup is <strong>immediately installed/generated the moment the app opens</strong>.
+                You can download any backup directly to your computer or restore/install a previous state using the action buttons below.
+              </div>
+            </div>
           </div>
 
           {/* Backup Archive Table */}
@@ -1162,7 +1221,27 @@ export const Settings: React.FC = () => {
                           )}
                         </td>
                         <td style={{ textAlign: 'center' }}>
-                          <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                            <button
+                              className="btn btn-outline"
+                              onClick={() => handleDownloadBackup(b.fileName)}
+                              disabled={downloadingFile === b.fileName}
+                              title="Download SQL backup to your computer"
+                              style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem', color: '#0284c7', borderColor: '#bae6fd' }}
+                            >
+                              <Download size={13} color="#0284c7" />
+                              {downloadingFile === b.fileName ? 'Downloading...' : 'Download'}
+                            </button>
+                            <button
+                              className="btn btn-outline"
+                              onClick={() => handleRestoreBackup(b.fileName)}
+                              disabled={restoringFile === b.fileName}
+                              title="Install and restore database state from this backup"
+                              style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem', color: '#d97706', borderColor: '#fde68a' }}
+                            >
+                              <RotateCcw size={13} color="#d97706" />
+                              {restoringFile === b.fileName ? 'Restoring...' : 'Restore / Install'}
+                            </button>
                             <button
                               className="btn btn-outline"
                               onClick={() => handleVerifyBackup(b.fileName)}
