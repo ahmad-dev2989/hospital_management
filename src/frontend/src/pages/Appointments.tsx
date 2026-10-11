@@ -119,6 +119,57 @@ export const Appointments: React.FC = () => {
     return `${displayH}:${displayM} ${period}`;
   };
 
+  const selectDoctorForSchedule = (docId: string, currentDocs: DoctorDto[] = doctors) => {
+    setScheduleDoctorId(docId);
+    setSelectedEditDay(null);
+    const targetDoc = currentDocs.find((d) => d.id === docId);
+    if (targetDoc?.schedules && targetDoc.schedules.length > 0) {
+      const newMap: Record<number, Array<{ startTime: string; endTime: string }>> = {
+        1: [], 2: [], 3: [], 4: [], 5: [], 6: [], 0: []
+      };
+      targetDoc.schedules.forEach((s) => {
+        if (newMap[s.dayOfWeek] !== undefined) {
+          newMap[s.dayOfWeek].push({ startTime: s.startTime, endTime: s.endTime });
+        }
+      });
+
+      const baseShifts = newMap[1].length > 0
+        ? newMap[1]
+        : Object.values(newMap).find((s) => s.length > 0) || [{ startTime: '13:00', endTime: '17:00' }];
+
+      const custom: Record<number, boolean> = {};
+      [0, 1, 2, 3, 4, 5, 6].forEach((d) => {
+        if (newMap[d].length === 0) {
+          newMap[d] = [...baseShifts];
+        } else {
+          const differs =
+            newMap[d].length !== baseShifts.length ||
+            newMap[d].some((s, idx) => s.startTime !== baseShifts[idx]?.startTime || s.endTime !== baseShifts[idx]?.endTime);
+          if (differs) {
+            custom[d] = true;
+          }
+        }
+      });
+
+      setDefaultShifts(baseShifts);
+      setDayShiftsMap(newMap);
+      setCustomizedDays(custom);
+    } else {
+      const def = [{ startTime: '13:00', endTime: '17:00' }];
+      setDefaultShifts(def);
+      setDayShiftsMap({
+        1: [...def],
+        2: [...def],
+        3: [...def],
+        4: [...def],
+        5: [...def],
+        6: [...def],
+        0: [...def],
+      });
+      setCustomizedDays({});
+    }
+  };
+
   // Reschedule form state
   const [rescheduleDate, setRescheduleDate] = useState(new Date().toISOString().split('T')[0]);
   const [rescheduleSlots, setRescheduleSlots] = useState<TimeSlotDto[]>([]);
@@ -405,6 +456,14 @@ export const Appointments: React.FC = () => {
       showToast(`Time slots confirmed and saved for ${docName}!`);
       setShowScheduleModal(false);
 
+      // Refresh doctor list to store updated schedules
+      try {
+        const updatedDocs = await api.getDoctors();
+        setDoctors(updatedDocs);
+      } catch (e) {
+        console.warn('Failed to refresh doctors after schedule update', e);
+      }
+
       // Refresh slots immediately for current booking view
       const activeDocId = singleCandidateDoctor ? singleCandidateDoctor.id : bookDoctorId;
       if (activeDocId) {
@@ -537,14 +596,15 @@ export const Appointments: React.FC = () => {
           <button
             className="btn btn-outline"
             onClick={() => {
-              setScheduleDoctorId(singleCandidateDoctor?.id || bookDoctorId || (doctors[0]?.id || ''));
+              const targetDocId = singleCandidateDoctor?.id || bookDoctorId || (doctors[0]?.id || '');
+              selectDoctorForSchedule(targetDocId);
               setShowScheduleModal(true);
             }}
             style={{ fontSize: '0.825rem', padding: '0.45rem 0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#0d9488', borderColor: '#99f6e4', backgroundColor: '#f0fdfa' }}
-            title="Configure doctor shift windows and auto-generate 15-minute appointment slots"
+            title="Configure doctor time slots (e.g. 1-5 PM for all days, or custom per day)"
           >
             <Clock size={15} />
-            Doctor Shifts & Slots
+            Doctor Time Slot Settings
           </button>
           <button
             className="btn btn-primary"
@@ -1099,13 +1159,14 @@ export const Appointments: React.FC = () => {
                       type="button"
                       className="btn btn-outline"
                       onClick={() => {
-                        setScheduleDoctorId(singleCandidateDoctor?.id || bookDoctorId);
+                        const targetDocId = singleCandidateDoctor?.id || bookDoctorId || (doctors[0]?.id || '');
+                        selectDoctorForSchedule(targetDocId);
                         setShowScheduleModal(true);
                       }}
                       style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem', marginTop: '0.4rem', color: '#0d9488', borderColor: '#99f6e4', backgroundColor: '#fff' }}
                     >
                       <Clock size={13} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
-                      Add / Customize Shifts & Slots (e.g. 1-5 PM)
+                      Doctor Time Slot Settings (e.g. 1–5 PM)
                     </button>
                   </div>
                 ) : (
@@ -1410,7 +1471,7 @@ export const Appointments: React.FC = () => {
                   return (
                     <div
                       key={d.id}
-                      onClick={() => setScheduleDoctorId(d.id)}
+                      onClick={() => selectDoctorForSchedule(d.id)}
                       style={{
                         padding: '0.75rem 0.9rem',
                         borderRadius: '8px',
@@ -1833,7 +1894,7 @@ export const Appointments: React.FC = () => {
                     <RefreshCw size={14} className="spin" /> Saving Time Slots...
                   </span>
                 ) : (
-                  'Confirm & Save Time Slots'
+                  'Confirm & Add Time Slots'
                 )}
               </button>
             </div>
