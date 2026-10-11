@@ -376,6 +376,17 @@ export const Reports: React.FC = () => {
         </div>
       )}
 
+      {/* Loading Skeleton Card for Dashboard */}
+      {loading && !dashboardData && activeTab === 'dashboard' && (
+        <div className="card" style={{ padding: '3.5rem', textAlign: 'center' }}>
+          <Activity size={36} className="spin" color="#0d9488" style={{ margin: '0 auto 1rem auto' }} />
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>Loading Executive Operational Dashboard...</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.25rem' }}>
+            Aggregating census, appointment flow, departmental workloads, and inventory alerts.
+          </p>
+        </div>
+      )}
+
       {/* TAB 1: EXECUTIVE OPERATIONAL DASHBOARD */}
       {activeTab === 'dashboard' && dashboardData && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -392,10 +403,10 @@ export const Reports: React.FC = () => {
                 <Users size={18} color="#0d9488" />
               </div>
               <div style={{ fontSize: '1.85rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                {dashboardData.totalPatientsCount.toLocaleString()}
+                {(dashboardData.totalPatientsCount ?? 0).toLocaleString()}
               </div>
               <div style={{ fontSize: '0.75rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                <ArrowUpRight size={13} /> +{dashboardData.newPatientsTodayCount} registered today
+                <ArrowUpRight size={13} /> +{dashboardData.newPatientsTodayCount ?? 0} registered today
               </div>
             </div>
 
@@ -405,10 +416,10 @@ export const Reports: React.FC = () => {
                 <Activity size={18} color="#3b82f6" />
               </div>
               <div style={{ fontSize: '1.85rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                {dashboardData.totalEncountersTodayCount}
+                {dashboardData.totalEncountersTodayCount ?? 0}
               </div>
               <div style={{ fontSize: '0.75rem', color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                <Clock size={13} /> {dashboardData.activeEncountersCount} currently in-progress
+                <Clock size={13} /> {dashboardData.activeEncountersCount ?? 0} currently in-progress
               </div>
             </div>
 
@@ -418,10 +429,10 @@ export const Reports: React.FC = () => {
                 <Calendar size={18} color="#8b5cf6" />
               </div>
               <div style={{ fontSize: '1.85rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                {dashboardData.appointmentsTodayTotal}
+                {dashboardData.appointmentsTodayTotal ?? 0}
               </div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                {dashboardData.appointmentsCompletedCount} completed · {dashboardData.appointmentsWaitingCount} waiting
+                {dashboardData.appointmentsCompletedCount ?? 0} completed · {dashboardData.appointmentsWaitingCount ?? 0} waiting
               </div>
             </div>
 
@@ -430,11 +441,11 @@ export const Reports: React.FC = () => {
                 <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>CLINICAL BOTTLENECKS</span>
                 <ShieldAlert size={18} color="#ef4444" />
               </div>
-              <div style={{ fontSize: '1.85rem', fontWeight: 700, color: dashboardData.criticalLabResultsCount > 0 ? '#ef4444' : 'var(--text-main)' }}>
-                {dashboardData.criticalLabResultsCount + dashboardData.lowStockDrugsCount}
+              <div style={{ fontSize: '1.85rem', fontWeight: 700, color: (dashboardData.criticalLabResultsCount ?? 0) > 0 ? '#ef4444' : 'var(--text-main)' }}>
+                {(dashboardData.criticalLabResultsCount ?? 0) + (dashboardData.lowStockDrugsCount ?? 0)}
               </div>
               <div style={{ fontSize: '0.75rem', color: '#ef4444' }}>
-                {dashboardData.criticalLabResultsCount} critical lab alerts · {dashboardData.lowStockDrugsCount} low stock drugs
+                {dashboardData.criticalLabResultsCount ?? 0} critical lab alerts · {dashboardData.lowStockDrugsCount ?? 0} low stock drugs
               </div>
             </div>
           </div>
@@ -450,7 +461,7 @@ export const Reports: React.FC = () => {
                   Real-time status breakdown of registered clinic appointments scheduled for today.
                 </p>
               </div>
-              <span className="badge badge-info">{dashboardData.appointmentsTodayTotal} Total Scheduled</span>
+              <span className="badge badge-info">{dashboardData.appointmentsTodayTotal ?? 0} Total Scheduled</span>
             </div>
 
             <div style={{
@@ -470,7 +481,7 @@ export const Reports: React.FC = () => {
                   Waiting in Lobby
                 </div>
                 <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#f59e0b', marginTop: '0.25rem' }}>
-                  {dashboardData.appointmentsWaitingCount}
+                  {dashboardData.appointmentsWaitingCount ?? 0}
                 </div>
                 <span className="badge badge-warning" style={{ marginTop: '0.35rem', fontSize: '0.7rem' }}>Arrived</span>
               </div>
@@ -486,7 +497,7 @@ export const Reports: React.FC = () => {
                   In Consultation
                 </div>
                 <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#3b82f6', marginTop: '0.25rem' }}>
-                  {dashboardData.appointmentsInConsultationCount}
+                  {dashboardData.appointmentsInConsultationCount ?? 0}
                 </div>
                 <span className="badge badge-info" style={{ marginTop: '0.35rem', fontSize: '0.7rem' }}>With Doctor</span>
               </div>
@@ -502,7 +513,7 @@ export const Reports: React.FC = () => {
                   Completed
                 </div>
                 <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#10b981', marginTop: '0.25rem' }}>
-                  {dashboardData.appointmentsCompletedCount}
+                  {dashboardData.appointmentsCompletedCount ?? 0}
                 </div>
                 <span className="badge badge-success" style={{ marginTop: '0.35rem', fontSize: '0.7rem' }}>Discharged</span>
               </div>
@@ -518,7 +529,7 @@ export const Reports: React.FC = () => {
                   No-Show / Missed
                 </div>
                 <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>
-                  {dashboardData.appointmentsNoShowCount}
+                  {dashboardData.appointmentsNoShowCount ?? 0}
                 </div>
                 <span className="badge" style={{ marginTop: '0.35rem', fontSize: '0.7rem', background: '#e2e8f0', color: '#475569' }}>Absent</span>
               </div>
@@ -554,14 +565,14 @@ export const Reports: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {dashboardData.departmentWorkloads.length === 0 ? (
+                    {(dashboardData.departmentWorkloads ?? []).length === 0 ? (
                       <tr>
                         <td colSpan={5} style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-muted)' }}>
                           No clinical departments active.
                         </td>
                       </tr>
                     ) : (
-                      dashboardData.departmentWorkloads.map((dept) => (
+                      (dashboardData.departmentWorkloads ?? []).map((dept) => (
                         <tr key={dept.departmentId}>
                           <td><strong>{dept.departmentName}</strong></td>
                           <td style={{ textAlign: 'center' }}>{dept.activeDoctorsCount}</td>
@@ -602,16 +613,16 @@ export const Reports: React.FC = () => {
                 <div style={{
                   padding: '0.85rem',
                   borderRadius: '6px',
-                  backgroundColor: dashboardData.criticalLabResultsCount > 0 ? '#fef2f2' : '#f8fafc',
-                  border: dashboardData.criticalLabResultsCount > 0 ? '1px solid #fecaca' : '1px solid var(--border)',
+                  backgroundColor: (dashboardData.criticalLabResultsCount ?? 0) > 0 ? '#fef2f2' : '#f8fafc',
+                  border: (dashboardData.criticalLabResultsCount ?? 0) > 0 ? '1px solid #fecaca' : '1px solid var(--border)',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                    <AlertTriangle size={18} color={dashboardData.criticalLabResultsCount > 0 ? '#ef4444' : '#64748b'} />
+                    <AlertTriangle size={18} color={(dashboardData.criticalLabResultsCount ?? 0) > 0 ? '#ef4444' : '#64748b'} />
                     <div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: dashboardData.criticalLabResultsCount > 0 ? '#991b1b' : 'var(--text-main)' }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: (dashboardData.criticalLabResultsCount ?? 0) > 0 ? '#991b1b' : 'var(--text-main)' }}>
                         Abnormal / Critical Lab Results
                       </div>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
@@ -619,8 +630,8 @@ export const Reports: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                  <span className={dashboardData.criticalLabResultsCount > 0 ? 'badge badge-danger' : 'badge'}>
-                    {dashboardData.criticalLabResultsCount}
+                  <span className={(dashboardData.criticalLabResultsCount ?? 0) > 0 ? 'badge badge-danger' : 'badge'}>
+                    {dashboardData.criticalLabResultsCount ?? 0}
                   </span>
                 </div>
 
@@ -644,7 +655,7 @@ export const Reports: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                  <span className="badge badge-info">{dashboardData.pendingLabOrdersCount}</span>
+                  <span className="badge badge-info">{dashboardData.pendingLabOrdersCount ?? 0}</span>
                 </div>
 
                 <div style={{
@@ -667,22 +678,22 @@ export const Reports: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                  <span className="badge badge-warning">{dashboardData.pendingPrescriptionsCount}</span>
+                  <span className="badge badge-warning">{dashboardData.pendingPrescriptionsCount ?? 0}</span>
                 </div>
 
                 <div style={{
                   padding: '0.85rem',
                   borderRadius: '6px',
-                  backgroundColor: dashboardData.lowStockDrugsCount > 0 ? '#fffbeb' : '#f8fafc',
-                  border: dashboardData.lowStockDrugsCount > 0 ? '1px solid #fde68a' : '1px solid var(--border)',
+                  backgroundColor: (dashboardData.lowStockDrugsCount ?? 0) > 0 ? '#fffbeb' : '#f8fafc',
+                  border: (dashboardData.lowStockDrugsCount ?? 0) > 0 ? '1px solid #fde68a' : '1px solid var(--border)',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                    <AlertTriangle size={18} color={dashboardData.lowStockDrugsCount > 0 ? '#d97706' : '#64748b'} />
+                    <AlertTriangle size={18} color={(dashboardData.lowStockDrugsCount ?? 0) > 0 ? '#d97706' : '#64748b'} />
                     <div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: dashboardData.lowStockDrugsCount > 0 ? '#92400e' : 'var(--text-main)' }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: (dashboardData.lowStockDrugsCount ?? 0) > 0 ? '#92400e' : 'var(--text-main)' }}>
                         Low Stock Formulary Drugs
                       </div>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
@@ -690,16 +701,16 @@ export const Reports: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                  <span className={dashboardData.lowStockDrugsCount > 0 ? 'badge badge-warning' : 'badge'}>
-                    {dashboardData.lowStockDrugsCount}
+                  <span className={(dashboardData.lowStockDrugsCount ?? 0) > 0 ? 'badge badge-warning' : 'badge'}>
+                    {dashboardData.lowStockDrugsCount ?? 0}
                   </span>
                 </div>
 
                 <div style={{
                   padding: '0.85rem',
                   borderRadius: '6px',
-                  backgroundColor: dashboardData.expiringBatchesCount > 0 ? '#fdf4ff' : '#f8fafc',
-                  border: dashboardData.expiringBatchesCount > 0 ? '1px solid #f5d0fe' : '1px solid var(--border)',
+                  backgroundColor: (dashboardData.expiringBatchesCount ?? 0) > 0 ? '#fdf4ff' : '#f8fafc',
+                  border: (dashboardData.expiringBatchesCount ?? 0) > 0 ? '1px solid #f5d0fe' : '1px solid var(--border)',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center'
@@ -707,7 +718,7 @@ export const Reports: React.FC = () => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                     <Clock size={18} color="#c026d3" />
                     <div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: dashboardData.expiringBatchesCount > 0 ? '#86198f' : 'var(--text-main)' }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: (dashboardData.expiringBatchesCount ?? 0) > 0 ? '#86198f' : 'var(--text-main)' }}>
                         Batches Expiring (Next 90 Days)
                       </div>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
@@ -716,7 +727,7 @@ export const Reports: React.FC = () => {
                     </div>
                   </div>
                   <span className="badge" style={{ background: '#f5d0fe', color: '#86198f' }}>
-                    {dashboardData.expiringBatchesCount}
+                    {dashboardData.expiringBatchesCount ?? 0}
                   </span>
                 </div>
               </div>
@@ -781,6 +792,17 @@ export const Reports: React.FC = () => {
             </button>
           </div>
 
+          {/* Loading Skeleton Card for Financial */}
+          {loading && !financialData && (
+            <div className="card" style={{ padding: '3.5rem', textAlign: 'center' }}>
+              <Activity size={36} className="spin" color="#0d9488" style={{ margin: '0 auto 1rem auto' }} />
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>Loading Financial Reconciliation...</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.25rem' }}>
+                Compiling revenue ledger, billing collections, and cashier tender channels.
+              </p>
+            </div>
+          )}
+
           {financialData && (
             <>
               {/* Financial Summary KPI Cards */}
@@ -792,37 +814,37 @@ export const Reports: React.FC = () => {
                 <div className="card" style={{ padding: '1.25rem' }}>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>TOTAL INVOICED</div>
                   <div style={{ fontSize: '1.6rem', fontWeight: 700, color: 'var(--text-main)', marginTop: '0.25rem' }}>
-                    {formatCurrency(financialData.totalInvoiced)}
+                    {formatCurrency(financialData.totalInvoiced ?? 0)}
                   </div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                    {financialData.totalInvoicesIssued} invoices issued
+                    {financialData.totalInvoicesIssued ?? 0} invoices issued
                   </div>
                 </div>
 
                 <div className="card" style={{ padding: '1.25rem' }}>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>GROSS COLLECTED</div>
                   <div style={{ fontSize: '1.6rem', fontWeight: 700, color: '#10b981', marginTop: '0.25rem' }}>
-                    {formatCurrency(financialData.totalCollected)}
+                    {formatCurrency(financialData.totalCollected ?? 0)}
                   </div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                    {financialData.totalPaymentsCaptured} receipts recorded
+                    {financialData.totalPaymentsCaptured ?? 0} receipts recorded
                   </div>
                 </div>
 
                 <div className="card" style={{ padding: '1.25rem' }}>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>TOTAL REFUNDS</div>
                   <div style={{ fontSize: '1.6rem', fontWeight: 700, color: '#ef4444', marginTop: '0.25rem' }}>
-                    {formatCurrency(financialData.totalRefunded)}
+                    {formatCurrency(financialData.totalRefunded ?? 0)}
                   </div>
                   <div style={{ fontSize: '0.75rem', color: '#ef4444', marginTop: '0.25rem' }}>
-                    {financialData.totalRefundsProcessed} refund authorizations
+                    {financialData.totalRefundsProcessed ?? 0} refund authorizations
                   </div>
                 </div>
 
                 <div className="card" style={{ padding: '1.25rem', backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }}>
                   <div style={{ fontSize: '0.75rem', color: '#166534', fontWeight: 700 }}>NET REVENUE COLLECTED</div>
                   <div style={{ fontSize: '1.6rem', fontWeight: 700, color: '#15803d', marginTop: '0.25rem' }}>
-                    {formatCurrency(financialData.netCollected)}
+                    {formatCurrency(financialData.netCollected ?? 0)}
                   </div>
                   <div style={{ fontSize: '0.75rem', color: '#166534', marginTop: '0.25rem' }}>
                     Cashier & bank net retained
@@ -832,7 +854,7 @@ export const Reports: React.FC = () => {
                 <div className="card" style={{ padding: '1.25rem' }}>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>OUTSTANDING BALANCE</div>
                   <div style={{ fontSize: '1.6rem', fontWeight: 700, color: '#f59e0b', marginTop: '0.25rem' }}>
-                    {formatCurrency(financialData.totalOutstandingReceivables)}
+                    {formatCurrency(financialData.totalOutstandingReceivables ?? 0)}
                   </div>
                   <div style={{ fontSize: '0.75rem', color: '#f59e0b', marginTop: '0.25rem' }}>
                     Unsettled patient balances
@@ -853,14 +875,14 @@ export const Reports: React.FC = () => {
                   </p>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    {financialData.revenueByPaymentMethod.map((item) => (
+                    {(financialData.revenueByPaymentMethod ?? []).map((item) => (
                       <div key={item.methodName} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
                           <span style={{ fontWeight: 600 }}>
-                            {item.methodName} ({item.transactionsCount} tx)
+                            {item.methodName} ({item.transactionsCount ?? 0} tx)
                           </span>
                           <span style={{ fontWeight: 700 }}>
-                            {formatCurrency(item.amount)} ({item.percentageOfTotal.toFixed(1)}%)
+                            {formatCurrency(item.amount ?? 0)} ({(item.percentageOfTotal ?? 0).toFixed(1)}%)
                           </span>
                         </div>
                         <div style={{
@@ -871,7 +893,7 @@ export const Reports: React.FC = () => {
                           overflow: 'hidden'
                         }}>
                           <div style={{
-                            width: `${Math.min(100, Math.max(0, item.percentageOfTotal))}%`,
+                            width: `${Math.min(100, Math.max(0, item.percentageOfTotal ?? 0))}%`,
                             height: '100%',
                             backgroundColor: item.methodName.toLowerCase().includes('cash')
                               ? '#10b981'
@@ -902,19 +924,19 @@ export const Reports: React.FC = () => {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border)' }}>
                       <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Discounts Conceded:</span>
-                      <strong style={{ fontSize: '0.9rem', color: '#ef4444' }}>{formatCurrency(financialData.totalDiscountsGranted)}</strong>
+                      <strong style={{ fontSize: '0.9rem', color: '#ef4444' }}>{formatCurrency(financialData.totalDiscountsGranted ?? 0)}</strong>
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border)' }}>
                       <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Sales Tax / VAT:</span>
-                      <strong style={{ fontSize: '0.9rem', color: '#3b82f6' }}>{formatCurrency(financialData.totalTaxCollected)}</strong>
+                      <strong style={{ fontSize: '0.9rem', color: '#3b82f6' }}>{formatCurrency(financialData.totalTaxCollected ?? 0)}</strong>
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border)' }}>
                       <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Collection Efficiency:</span>
                       <strong style={{ fontSize: '0.9rem', color: '#10b981' }}>
-                        {financialData.totalInvoiced > 0
-                          ? ((financialData.totalCollected / financialData.totalInvoiced) * 100).toFixed(1) + '%'
+                        {(financialData.totalInvoiced ?? 0) > 0
+                          ? (((financialData.totalCollected ?? 0) / financialData.totalInvoiced) * 100).toFixed(1) + '%'
                           : '100%'}
                       </strong>
                     </div>
@@ -951,27 +973,27 @@ export const Reports: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {financialData.dailyTrend.length === 0 ? (
+                      {(financialData.dailyTrend ?? []).length === 0 ? (
                         <tr>
                           <td colSpan={7} style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-muted)' }}>
                             No financial records in this timeframe.
                           </td>
                         </tr>
                       ) : (
-                        financialData.dailyTrend.map((row) => (
+                        (financialData.dailyTrend ?? []).map((row) => (
                           <tr key={row.date}>
                             <td><strong>{row.date}</strong></td>
-                            <td style={{ textAlign: 'center' }}>{row.invoicesCount}</td>
-                            <td style={{ textAlign: 'right' }}>{formatCurrency(row.invoicedAmount)}</td>
-                            <td style={{ textAlign: 'center' }}>{row.paymentsCount}</td>
+                            <td style={{ textAlign: 'center' }}>{row.invoicesCount ?? 0}</td>
+                            <td style={{ textAlign: 'right' }}>{formatCurrency(row.invoicedAmount ?? 0)}</td>
+                            <td style={{ textAlign: 'center' }}>{row.paymentsCount ?? 0}</td>
                             <td style={{ textAlign: 'right', color: '#10b981', fontWeight: 600 }}>
-                              {formatCurrency(row.collectedAmount)}
+                              {formatCurrency(row.collectedAmount ?? 0)}
                             </td>
-                            <td style={{ textAlign: 'right', color: row.refundedAmount > 0 ? '#ef4444' : 'var(--text-muted)' }}>
-                              {formatCurrency(row.refundedAmount)}
+                            <td style={{ textAlign: 'right', color: (row.refundedAmount ?? 0) > 0 ? '#ef4444' : 'var(--text-muted)' }}>
+                              {formatCurrency(row.refundedAmount ?? 0)}
                             </td>
                             <td style={{ textAlign: 'right', fontWeight: 700 }}>
-                              {formatCurrency(row.netCollectedAmount)}
+                              {formatCurrency(row.netCollectedAmount ?? 0)}
                             </td>
                           </tr>
                         ))
@@ -1040,6 +1062,17 @@ export const Reports: React.FC = () => {
             </button>
           </div>
 
+          {/* Loading Skeleton Card for Laboratory */}
+          {loading && !labData && (
+            <div className="card" style={{ padding: '3.5rem', textAlign: 'center' }}>
+              <Activity size={36} className="spin" color="#0d9488" style={{ margin: '0 auto 1rem auto' }} />
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>Loading Laboratory Workload & TAT...</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.25rem' }}>
+                Analyzing specimen logs, diagnostic test volumes, and abnormality rates.
+              </p>
+            </div>
+          )}
+
           {labData && (
             <>
               {/* Lab KPIs */}
@@ -1051,41 +1084,41 @@ export const Reports: React.FC = () => {
                 <div className="card" style={{ padding: '1.25rem' }}>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>TOTAL LAB ORDERS</div>
                   <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--text-main)', marginTop: '0.25rem' }}>
-                    {labData.totalOrdersCount}
+                    {labData.totalOrdersCount ?? 0}
                   </div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                    {labData.totalTestsCount} individual test items
+                    {labData.totalTestsCount ?? 0} individual test items
                   </div>
                 </div>
 
                 <div className="card" style={{ padding: '1.25rem' }}>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>AVERAGE TURNAROUND TIME</div>
                   <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#0d9488', marginTop: '0.25rem' }}>
-                    {labData.averageTurnaroundTimeHours.toFixed(1)} <span style={{ fontSize: '1rem', fontWeight: 500 }}>hrs</span>
+                    {(labData.averageTurnaroundTimeHours ?? 0).toFixed(1)} <span style={{ fontSize: '1rem', fontWeight: 500 }}>hrs</span>
                   </div>
                   <div style={{ fontSize: '0.75rem', color: '#0d9488', marginTop: '0.25rem' }}>
-                    {labData.averageTurnaroundTimeHours <= 3.0 ? 'Optimal efficiency' : 'Acceptable range'}
+                    {(labData.averageTurnaroundTimeHours ?? 0) <= 3.0 ? 'Optimal efficiency' : 'Acceptable range'}
                   </div>
                 </div>
 
                 <div className="card" style={{ padding: '1.25rem' }}>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>COMPLETED & RELEASED</div>
                   <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#10b981', marginTop: '0.25rem' }}>
-                    {labData.completedOrdersCount}
+                    {labData.completedOrdersCount ?? 0}
                   </div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                    {labData.pendingOrdersCount} orders currently in worklist
+                    {labData.pendingOrdersCount ?? 0} orders currently in worklist
                   </div>
                 </div>
 
                 <div className="card" style={{ padding: '1.25rem' }}>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>ABNORMAL RESULTS</div>
-                  <div style={{ fontSize: '1.75rem', fontWeight: 700, color: labData.abnormalResultsCount > 0 ? '#ef4444' : '#10b981', marginTop: '0.25rem' }}>
-                    {labData.abnormalResultsCount}
+                  <div style={{ fontSize: '1.75rem', fontWeight: 700, color: (labData.abnormalResultsCount ?? 0) > 0 ? '#ef4444' : '#10b981', marginTop: '0.25rem' }}>
+                    {labData.abnormalResultsCount ?? 0}
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: labData.abnormalResultsCount > 0 ? '#ef4444' : '#10b981', marginTop: '0.25rem' }}>
-                    {labData.totalTestsCount > 0
-                      ? ((labData.abnormalResultsCount / labData.totalTestsCount) * 100).toFixed(1) + '% test abnormality rate'
+                  <div style={{ fontSize: '0.75rem', color: (labData.abnormalResultsCount ?? 0) > 0 ? '#ef4444' : '#10b981', marginTop: '0.25rem' }}>
+                    {(labData.totalTestsCount ?? 0) > 0
+                      ? (((labData.abnormalResultsCount ?? 0) / labData.totalTestsCount) * 100).toFixed(1) + '% test abnormality rate'
                       : '0% abnormality'}
                   </div>
                 </div>
@@ -1113,33 +1146,33 @@ export const Reports: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {labData.categoryBreakdown.length === 0 ? (
+                      {(labData.categoryBreakdown ?? []).length === 0 ? (
                         <tr>
                           <td colSpan={6} style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-muted)' }}>
                             No laboratory test records found in this window.
                           </td>
                         </tr>
                       ) : (
-                        labData.categoryBreakdown.map((cat) => (
+                        (labData.categoryBreakdown ?? []).map((cat) => (
                           <tr key={cat.category}>
                             <td><strong>{cat.category}</strong></td>
-                            <td style={{ textAlign: 'center' }}>{cat.ordersCount}</td>
+                            <td style={{ textAlign: 'center' }}>{cat.ordersCount ?? 0}</td>
                             <td style={{ textAlign: 'center' }}>
-                              <span className="badge badge-info">{cat.testsCount}</span>
+                              <span className="badge badge-info">{cat.testsCount ?? 0}</span>
                             </td>
                             <td style={{ textAlign: 'center' }}>
-                              {cat.abnormalTestsCount > 0 ? (
+                              {(cat.abnormalTestsCount ?? 0) > 0 ? (
                                 <span className="badge badge-danger">{cat.abnormalTestsCount}</span>
                               ) : (
                                 <span className="badge badge-success">0</span>
                               )}
                             </td>
                             <td style={{ textAlign: 'right', fontWeight: 600 }}>
-                              {formatCurrency(cat.totalRevenue)}
+                              {formatCurrency(cat.totalRevenue ?? 0)}
                             </td>
                             <td style={{ textAlign: 'center' }}>
-                              {labData.totalTestsCount > 0
-                                ? ((cat.testsCount / labData.totalTestsCount) * 100).toFixed(1) + '%'
+                              {(labData.totalTestsCount ?? 0) > 0
+                                ? (((cat.testsCount ?? 0) / labData.totalTestsCount) * 100).toFixed(1) + '%'
                                 : '0%'}
                             </td>
                           </tr>
@@ -1156,165 +1189,180 @@ export const Reports: React.FC = () => {
       )}
 
       {/* TAB 4: PHARMACY STOCK VALUATION & EXPIRY AGING */}
-      {activeTab === 'pharmacy' && pharmacyData && (
+      {activeTab === 'pharmacy' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           
-          {/* Action Header */}
-          <div className="card" style={{ padding: '1rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-            <div>
-              <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Inventory Valuation Timestamp:</span>
-              <span style={{ marginLeft: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                {new Date(pharmacyData.generatedAt).toLocaleString()}
-              </span>
+          {/* Loading Skeleton Card for Pharmacy */}
+          {loading && !pharmacyData && (
+            <div className="card" style={{ padding: '3.5rem', textAlign: 'center' }}>
+              <Activity size={36} className="spin" color="#0d9488" style={{ margin: '0 auto 1rem auto' }} />
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>Loading Pharmacy Valuation & Expiry Aging...</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.25rem' }}>
+                Evaluating active formulary inventory, acquisition costs, margins, and FEFO expiry schedules.
+              </p>
             </div>
+          )}
 
-            <button
-              className="btn btn-outline"
-              onClick={handleExportPharmacyCsv}
-              disabled={exportingCsv}
-              style={{ fontSize: '0.85rem' }}
-            >
-              <Download size={14} />
-              {exportingCsv ? 'Exporting...' : 'Export Pharmacy Valuation CSV'}
-            </button>
-          </div>
+          {pharmacyData && (
+            <>
+              {/* Action Header */}
+              <div className="card" style={{ padding: '1rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                <div>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Inventory Valuation Timestamp:</span>
+                  <span style={{ marginLeft: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                    {pharmacyData.generatedAt ? new Date(pharmacyData.generatedAt).toLocaleString() : 'N/A'}
+                  </span>
+                </div>
 
-          {/* Financial Valuation KPI Cards */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-            gap: '1rem'
-          }}>
-            <div className="card" style={{ padding: '1.25rem' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>ACTIVE FORMULARY STOCK</div>
-              <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--text-main)', marginTop: '0.25rem' }}>
-                {pharmacyData.totalUnitsOnHand.toLocaleString()} <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>units</span>
+                <button
+                  className="btn btn-outline"
+                  onClick={handleExportPharmacyCsv}
+                  disabled={exportingCsv}
+                  style={{ fontSize: '0.85rem' }}
+                >
+                  <Download size={14} />
+                  {exportingCsv ? 'Exporting...' : 'Export Pharmacy Valuation CSV'}
+                </button>
               </div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                {pharmacyData.totalFormularyDrugsCount} drugs across {pharmacyData.totalActiveBatchesCount} batches
-              </div>
-            </div>
 
-            <div className="card" style={{ padding: '1.25rem' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>TOTAL ACQUISITION COST</div>
-              <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#3b82f6', marginTop: '0.25rem' }}>
-                {formatCurrency(pharmacyData.totalInventoryCostValue)}
-              </div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                Capital tied up in pharmaceutical stock
-              </div>
-            </div>
+              {/* Financial Valuation KPI Cards */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+                gap: '1rem'
+              }}>
+                <div className="card" style={{ padding: '1.25rem' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>ACTIVE FORMULARY STOCK</div>
+                  <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--text-main)', marginTop: '0.25rem' }}>
+                    {(pharmacyData.totalUnitsOnHand ?? 0).toLocaleString()} <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>units</span>
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                    {pharmacyData.totalFormularyDrugsCount ?? 0} drugs across {pharmacyData.totalActiveBatchesCount ?? 0} batches
+                  </div>
+                </div>
 
-            <div className="card" style={{ padding: '1.25rem' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>ESTIMATED RETAIL VALUE</div>
-              <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#10b981', marginTop: '0.25rem' }}>
-                {formatCurrency(pharmacyData.totalInventoryRetailValue)}
-              </div>
-              <div style={{ fontSize: '0.75rem', color: '#10b981', marginTop: '0.25rem' }}>
-                Projected gross revenue at full dispensing
-              </div>
-            </div>
+                <div className="card" style={{ padding: '1.25rem' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>TOTAL ACQUISITION COST</div>
+                  <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#3b82f6', marginTop: '0.25rem' }}>
+                    {formatCurrency(pharmacyData.totalInventoryCostValue ?? 0)}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                    Capital tied up in pharmaceutical stock
+                  </div>
+                </div>
 
-            <div className="card" style={{ padding: '1.25rem', backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }}>
-              <div style={{ fontSize: '0.75rem', color: '#166534', fontWeight: 700 }}>PROJECTED GROSS MARGIN</div>
-              <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#15803d', marginTop: '0.25rem' }}>
-                {formatCurrency(pharmacyData.projectedGrossMarginValue)}
-              </div>
-              <div style={{ fontSize: '0.75rem', color: '#166534', marginTop: '0.25rem' }}>
-                Margin: {pharmacyData.projectedGrossMarginPercentage.toFixed(1)}%
-              </div>
-            </div>
-          </div>
+                <div className="card" style={{ padding: '1.25rem' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>ESTIMATED RETAIL VALUE</div>
+                  <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#10b981', marginTop: '0.25rem' }}>
+                    {formatCurrency(pharmacyData.totalInventoryRetailValue ?? 0)}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#10b981', marginTop: '0.25rem' }}>
+                    Projected gross revenue at full dispensing
+                  </div>
+                </div>
 
-          {/* Wastage & Loss Section */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-            <div className="card" style={{ padding: '1.25rem', backgroundColor: '#fef2f2', borderColor: '#fecaca' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                <AlertTriangle size={18} color="#ef4444" />
-                <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#991b1b', fontWeight: 700 }}>
-                  Expired Medication Wastage Loss
-                </h4>
+                <div className="card" style={{ padding: '1.25rem', backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#166534', fontWeight: 700 }}>PROJECTED GROSS MARGIN</div>
+                  <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#15803d', marginTop: '0.25rem' }}>
+                    {formatCurrency(pharmacyData.projectedGrossMarginValue ?? 0)}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#166534', marginTop: '0.25rem' }}>
+                    Margin: {(pharmacyData.projectedGrossMarginPercentage ?? 0).toFixed(1)}%
+                  </div>
+                </div>
               </div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#b91c1c' }}>
-                {formatCurrency(pharmacyData.expiredWastageCostValue)}
-              </div>
-              <div style={{ fontSize: '0.8rem', color: '#991b1b', marginTop: '0.25rem' }}>
-                {pharmacyData.expiredWastageUnits} units marked as expired & disposed
-              </div>
-            </div>
 
-            <div className="card" style={{ padding: '1.25rem', backgroundColor: '#fffbeb', borderColor: '#fde68a' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                <AlertCircle size={18} color="#d97706" />
-                <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#92400e', fontWeight: 700 }}>
-                  Damaged & Spoilage Wastage Loss
-                </h4>
-              </div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#b45309' }}>
-                {formatCurrency(pharmacyData.damagedWastageCostValue)}
-              </div>
-              <div style={{ fontSize: '0.8rem', color: '#92400e', marginTop: '0.25rem' }}>
-                {pharmacyData.damagedWastageUnits} units written off due to clinical damage
-              </div>
-            </div>
-          </div>
+              {/* Wastage & Loss Section */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                <div className="card" style={{ padding: '1.25rem', backgroundColor: '#fef2f2', borderColor: '#fecaca' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                    <AlertTriangle size={18} color="#ef4444" />
+                    <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#991b1b', fontWeight: 700 }}>
+                      Expired Medication Wastage Loss
+                    </h4>
+                  </div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#b91c1c' }}>
+                    {formatCurrency(pharmacyData.expiredWastageCostValue ?? 0)}
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: '#991b1b', marginTop: '0.25rem' }}>
+                    {pharmacyData.expiredWastageUnits ?? 0} units marked as expired & disposed
+                  </div>
+                </div>
 
-          {/* Expiry Aging Schedule Table */}
-          <div className="card" style={{ padding: '1.5rem' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: '0 0 0.5rem 0' }}>
-              FEFO Expiry Aging Schedule (Horizon Breakdown)
-            </h3>
-            <p style={{ margin: '0 0 1rem 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              Stock grouped by days remaining until expiration. First-Expired-First-Out prioritization protocol.
-            </p>
+                <div className="card" style={{ padding: '1.25rem', backgroundColor: '#fffbeb', borderColor: '#fde68a' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                    <AlertCircle size={18} color="#d97706" />
+                    <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#92400e', fontWeight: 700 }}>
+                      Damaged & Spoilage Wastage Loss
+                    </h4>
+                  </div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#b45309' }}>
+                    {formatCurrency(pharmacyData.damagedWastageCostValue ?? 0)}
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: '#92400e', marginTop: '0.25rem' }}>
+                    {pharmacyData.damagedWastageUnits ?? 0} units written off due to clinical damage
+                  </div>
+                </div>
+              </div>
 
-            <div className="table-wrapper">
-              <table className="desktop-table">
-                <thead>
-                  <tr>
-                    <th>Expiry Horizon</th>
-                    <th style={{ textAlign: 'center' }}>Batches Count</th>
-                    <th style={{ textAlign: 'center' }}>Total Units</th>
-                    <th style={{ textAlign: 'right' }}>Cost Value</th>
-                    <th style={{ textAlign: 'right' }}>Retail Value</th>
-                    <th style={{ textAlign: 'center' }}>Risk Level</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pharmacyData.expiryAgingSchedule.map((horizon) => {
-                    const isPast = horizon.horizonLabel.includes('Past');
-                    const is0to30 = horizon.horizonLabel.includes('0 - 30');
-                    const is31to90 = horizon.horizonLabel.includes('31 - 90');
-                    
-                    return (
-                      <tr key={horizon.horizonLabel} style={{
-                        backgroundColor: isPast ? '#fff1f2' : is0to30 ? '#fffbeb' : 'inherit'
-                      }}>
-                        <td>
-                          <strong>{horizon.horizonLabel}</strong>
-                        </td>
-                        <td style={{ textAlign: 'center' }}>{horizon.batchesCount}</td>
-                        <td style={{ textAlign: 'center' }}>{horizon.totalUnits}</td>
-                        <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatCurrency(horizon.costValue)}</td>
-                        <td style={{ textAlign: 'right' }}>{formatCurrency(horizon.retailValue)}</td>
-                        <td style={{ textAlign: 'center' }}>
-                          {isPast ? (
-                            <span className="badge badge-danger">Expired</span>
-                          ) : is0to30 ? (
-                            <span className="badge badge-danger">Immediate Risk</span>
-                          ) : is31to90 ? (
-                            <span className="badge badge-warning">High Priority</span>
-                          ) : (
-                            <span className="badge badge-success">Good Stock</span>
-                          )}
-                        </td>
+              {/* Expiry Aging Schedule Table */}
+              <div className="card" style={{ padding: '1.5rem' }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: '0 0 0.5rem 0' }}>
+                  FEFO Expiry Aging Schedule (Horizon Breakdown)
+                </h3>
+                <p style={{ margin: '0 0 1rem 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  Stock grouped by days remaining until expiration. First-Expired-First-Out prioritization protocol.
+                </p>
+
+                <div className="table-wrapper">
+                  <table className="desktop-table">
+                    <thead>
+                      <tr>
+                        <th>Expiry Horizon</th>
+                        <th style={{ textAlign: 'center' }}>Batches Count</th>
+                        <th style={{ textAlign: 'center' }}>Total Units</th>
+                        <th style={{ textAlign: 'right' }}>Cost Value</th>
+                        <th style={{ textAlign: 'right' }}>Retail Value</th>
+                        <th style={{ textAlign: 'center' }}>Risk Level</th>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                    </thead>
+                    <tbody>
+                      {(pharmacyData.expiryAgingSchedule ?? []).map((horizon) => {
+                        const isPast = horizon.horizonLabel?.includes('Past') ?? false;
+                        const is0to30 = horizon.horizonLabel?.includes('0 - 30') ?? false;
+                        const is31to90 = horizon.horizonLabel?.includes('31 - 90') ?? false;
+                        
+                        return (
+                          <tr key={horizon.horizonLabel} style={{
+                            backgroundColor: isPast ? '#fff1f2' : is0to30 ? '#fffbeb' : 'inherit'
+                          }}>
+                            <td>
+                              <strong>{horizon.horizonLabel}</strong>
+                            </td>
+                            <td style={{ textAlign: 'center' }}>{horizon.batchesCount ?? 0}</td>
+                            <td style={{ textAlign: 'center' }}>{horizon.totalUnits ?? 0}</td>
+                            <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatCurrency(horizon.costValue ?? 0)}</td>
+                            <td style={{ textAlign: 'right' }}>{formatCurrency(horizon.retailValue ?? 0)}</td>
+                            <td style={{ textAlign: 'center' }}>
+                              {isPast ? (
+                                <span className="badge badge-danger">Expired</span>
+                              ) : is0to30 ? (
+                                <span className="badge badge-danger">Immediate Risk</span>
+                              ) : is31to90 ? (
+                                <span className="badge badge-warning">High Priority</span>
+                              ) : (
+                                <span className="badge badge-success">Good Stock</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
 
         </div>
       )}

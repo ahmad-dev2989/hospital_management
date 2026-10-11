@@ -28,6 +28,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import { NavigationProvider, useNavigation } from './context/NavigationContext';
 import { CommandPalette } from './components/CommandPalette';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { Login } from './pages/Login';
 import { UserManagement } from './pages/UserManagement';
 import { AuditLogs } from './pages/AuditLogs';
@@ -380,6 +381,7 @@ function MainAppShell() {
 
         {/* Content Body */}
         <div className="content-body">
+          <ErrorBoundary fallbackTitle="Clinical Module View">
           {activeTab === 'foundation' && (
             <>
               {/* Top Foundation Metric Cards */}
@@ -578,6 +580,7 @@ function MainAppShell() {
               </button>
             </div>
           )}
+          </ErrorBoundary>
         </div>
       </main>
 
